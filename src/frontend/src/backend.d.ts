@@ -1,0 +1,74 @@
+import type { Principal } from "@icp-sdk/core/principal";
+export interface Some<T> {
+    __kind__: "Some";
+    value: T;
+}
+export interface None {
+    __kind__: "None";
+}
+export type Option<T> = Some<T> | None;
+export interface OrgSection {
+    id: bigint;
+    bannerBlobId?: string;
+    name: string;
+    createdAt: bigint;
+    slug: string;
+    description: string;
+    logoBlobId?: string;
+}
+export interface UserProfile {
+    bio: string;
+    principal: Principal;
+    orgId?: bigint;
+    name: string;
+    avatarBlobId?: string;
+}
+export interface Article {
+    id: bigint;
+    organizationId?: bigint;
+    bodyContent: string;
+    title: string;
+    isPublished: boolean;
+    createdAt: bigint;
+    tags: Array<string>;
+    author: string;
+    isFeatured: boolean;
+    publicationDate: string;
+    heroImageBlobId2?: string;
+    excerpt: string;
+    heroImageBlobId?: string;
+    authorPrincipal?: Principal;
+}
+export enum UserRole {
+    admin = "admin",
+    user = "user",
+    guest = "guest"
+}
+export interface backendInterface {
+    assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    createArticle(title: string, author: string, authorPrincipal: Principal | null, organizationId: bigint | null, publicationDate: string, heroImageBlobId: string | null, heroImageBlobId2: string | null, bodyContent: string, tags: Array<string>): Promise<bigint>;
+    createOrg(name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<bigint>;
+    deleteArticle(articleId: bigint): Promise<void>;
+    deleteOrg(orgId: bigint): Promise<void>;
+    featureArticle(articleId: bigint): Promise<void>;
+    getAllArticles(): Promise<Array<Article>>;
+    getArticleById(articleId: bigint): Promise<Article>;
+    getArticlesByOrg(orgId: bigint): Promise<Array<Article>>;
+    getArticlesByTag(tag: string): Promise<Array<Article>>;
+    getAuthorArticles(authorPrincipal: Principal): Promise<Array<Article>>;
+    getCallerUserProfile(): Promise<UserProfile | null>;
+    getCallerUserRole(): Promise<UserRole>;
+    getFeaturedArticle(): Promise<Article | null>;
+    getOrgById(orgId: bigint): Promise<OrgSection>;
+    getOrgs(): Promise<Array<OrgSection>>;
+    getPublishedArticles(): Promise<Array<Article>>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
+    isCallerAdmin(): Promise<boolean>;
+    publishArticle(articleId: bigint): Promise<void>;
+    saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    searchArticles(queryText: string): Promise<Array<Article>>;
+    unfeatureArticle(articleId: bigint): Promise<void>;
+    unpublishArticle(articleId: bigint): Promise<void>;
+    updateArticle(articleId: bigint, title: string, author: string, organizationId: bigint | null, publicationDate: string, heroImageBlobId: string | null, heroImageBlobId2: string | null, bodyContent: string, tags: Array<string>): Promise<void>;
+    updateOrg(orgId: bigint, name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<void>;
+}
