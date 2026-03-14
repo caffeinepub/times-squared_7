@@ -25,12 +25,18 @@ interface ArticleFormPanelProps {
   article?: Article | null;
   onBack: () => void;
   orgs: OrgSection[];
+  /** In contributor mode, only show orgs the contributor is a member of and hide publish toggle */
+  isContributorMode?: boolean;
+  /** Org IDs the contributor belongs to (used for filtering orgs list) */
+  contributorOrgIds?: bigint[];
 }
 
 export default function ArticleFormPanel({
   article,
   onBack,
   orgs,
+  isContributorMode = false,
+  contributorOrgIds = [],
 }: ArticleFormPanelProps) {
   const { identity } = useInternetIdentity();
   const { mutateAsync: createArticle, isPending: isCreating } =
@@ -63,11 +69,23 @@ export default function ArticleFormPanel({
 
   const editorRef = useRef<HTMLDivElement>(null);
 
+  // In contributor mode, filter orgs to only those the contributor belongs to
+  const availableOrgs = isContributorMode
+    ? orgs.filter((org) => contributorOrgIds.some((id) => id === org.id))
+    : orgs;
+
   useEffect(() => {
     if (editorRef.current && article?.bodyContent) {
       editorRef.current.innerHTML = article.bodyContent;
     }
   }, [article?.bodyContent]);
+
+  // Auto-set orgId for contributors if there's only one org available
+  useEffect(() => {
+    if (isContributorMode && availableOrgs.length === 1 && !orgId) {
+      setOrgId(availableOrgs[0].id.toString());
+    }
+  }, [isContributorMode, availableOrgs, orgId]);
 
   const handleHeroUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,7 +122,7 @@ export default function ArticleFormPanel({
       : new Date().toISOString();
 
     let principalArg: Principal | null = null;
-    if (authorPrincipal.trim()) {
+    if (!isContributorMode && authorPrincipal.trim()) {
       try {
         const { Principal } = await import("@icp-sdk/core/principal");
         principalArg = Principal.fromText(authorPrincipal.trim());
@@ -129,11 +147,13 @@ export default function ArticleFormPanel({
           bodyContent,
           tags: parsedTags,
         });
-        // Sync publish state if changed
-        if (isPublished && !article.isPublished) {
-          await publishArticle(article.id);
-        } else if (!isPublished && article.isPublished) {
-          await unpublishArticle(article.id);
+        // Only admins can sync publish state directly
+        if (!isContributorMode) {
+          if (isPublished && !article.isPublished) {
+            await publishArticle(article.id);
+          } else if (!isPublished && article.isPublished) {
+            await unpublishArticle(article.id);
+          }
         }
       } else {
         const newId = await createArticle({
@@ -147,11 +167,11 @@ export default function ArticleFormPanel({
           bodyContent,
           tags: parsedTags,
         });
-        if (isPublished) {
+        if (!isContributorMode && isPublished) {
           await publishArticle(newId);
         }
       }
-      toast.success(article ? "Article updated" : "Article created");
+      toast.success(article ? "Draft saved" : "Draft created");
       onBack();
     } catch {
       toast.error("Save failed");
@@ -167,7 +187,13 @@ export default function ArticleFormPanel({
     >
       <div className="flex items-center justify-between">
         <span className="section-label">
-          {article ? "Edit Article" : "New Article"}
+          {article
+            ? isContributorMode
+              ? "Edit Draft"
+              : "Edit Article"
+            : isContributorMode
+              ? "New Draft"
+              : "New Article"}
         </span>
       </div>
 
@@ -198,46 +224,56 @@ export default function ArticleFormPanel({
         />
       </div>
 
-      {/* Author Principal */}
-      <div className="space-y-1">
-        <Label className="text-white/40 text-[10px] uppercase tracking-widest font-sans">
-          Author Principal (optional)
-        </Label>
-        <input
-          value={authorPrincipal}
-          onChange={(e) => setAuthorPrincipal(e.target.value)}
-          placeholder="e.g. aaaaa-aa"
-          className="w-full bg-transparent border border-white/20 text-white/60 font-sans text-xs px-3 py-2 focus:outline-none focus:border-white/40 placeholder:text-white/20"
-        />
-      </div>
+      {/* Author Principal - admin only */}
+      {!isContributorMode && (
+        <div className="space-y-1">
+          <Label className="text-white/40 text-[10px] uppercase tracking-widest font-sans">
+            Author Principal (optional)
+          </Label>
+          <input
+            value={authorPrincipal}
+            onChange={(e) => setAuthorPrincipal(e.target.value)}
+            placeholder="e.g. aaaaa-aa"
+            className="w-full bg-transparent border border-white/20 text-white/60 font-sans text-xs px-3 py-2 focus:outline-none focus:border-white/40 placeholder:text-white/20"
+          />
+        </div>
+      )}
 
       {/* Org */}
       <div className="space-y-1">
         <Label className="text-white/40 text-[10px] uppercase tracking-widest font-sans">
           Organisation
         </Label>
-        <Select value={orgId} onValueChange={setOrgId}>
-          <SelectTrigger
-            data-ocid="admin.article_form.select"
-            className="bg-transparent border-white/20 text-white/70 font-sans text-sm focus:ring-0"
-          >
-            <SelectValue placeholder="None" />
-          </SelectTrigger>
-          <SelectContent className="bg-black border-white/20 text-white">
-            <SelectItem value="" className="font-sans text-white/50">
-              None
-            </SelectItem>
-            {orgs.map((org) => (
-              <SelectItem
-                key={org.id.toString()}
-                value={org.id.toString()}
-                className="font-sans"
-              >
-                {org.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isContributorMode && availableOrgs.length === 1 ? (
+          <p className="text-white/60 font-sans text-sm px-3 py-2 border border-white/10">
+            {availableOrgs[0].name}
+          </p>
+        ) : (
+          <Select value={orgId} onValueChange={setOrgId}>
+            <SelectTrigger
+              data-ocid="admin.article_form.select"
+              className="bg-transparent border-white/20 text-white/70 font-sans text-sm focus:ring-0"
+            >
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent className="bg-black border-white/20 text-white">
+              {!isContributorMode && (
+                <SelectItem value="" className="font-sans text-white/50">
+                  None
+                </SelectItem>
+              )}
+              {availableOrgs.map((org) => (
+                <SelectItem
+                  key={org.id.toString()}
+                  value={org.id.toString()}
+                  className="font-sans"
+                >
+                  {org.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Publication Date */}
@@ -293,17 +329,26 @@ export default function ArticleFormPanel({
         )}
       </div>
 
-      {/* Publish Toggle */}
-      <div className="flex items-center justify-between py-2 border-t border-white/10">
-        <Label className="text-white/60 text-xs font-sans uppercase tracking-wider">
-          {isPublished ? "Published" : "Draft"}
-        </Label>
-        <Switch
-          checked={isPublished}
-          onCheckedChange={setIsPublished}
-          className="data-[state=checked]:bg-emerald-500"
-        />
-      </div>
+      {/* Publish Toggle - admin only */}
+      {!isContributorMode && (
+        <div className="flex items-center justify-between py-2 border-t border-white/10">
+          <Label className="text-white/60 text-xs font-sans uppercase tracking-wider">
+            {isPublished ? "Published" : "Draft"}
+          </Label>
+          <Switch
+            checked={isPublished}
+            onCheckedChange={setIsPublished}
+            className="data-[state=checked]:bg-emerald-500"
+          />
+        </div>
+      )}
+
+      {/* Contributor mode note */}
+      {isContributorMode && (
+        <p className="text-white/30 text-[10px] font-sans uppercase tracking-widest py-2 border-t border-white/10">
+          Save draft, then submit for review from My Drafts
+        </p>
+      )}
 
       {/* Body Editor */}
       <div className="space-y-2">
@@ -396,7 +441,7 @@ export default function ArticleFormPanel({
           className="flex items-center gap-2 bg-white text-black px-4 py-2 text-xs font-sans uppercase tracking-wider hover:bg-white/90 transition-colors disabled:opacity-50"
         >
           {isPending && <Loader2 size={12} className="animate-spin" />}
-          {isPending ? "Saving..." : article ? "Update" : "Create"}
+          {isPending ? "Saving..." : article ? "Save" : "Create"}
         </button>
         <button
           type="button"

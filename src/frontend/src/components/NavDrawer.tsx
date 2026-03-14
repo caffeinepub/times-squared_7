@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Article } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  useGetMyMemberships,
   useGetMyOrgs,
   useGetSuperAdmin,
   useIsCallerAdmin,
@@ -13,9 +14,18 @@ import { navigate } from "../lib/navigate";
 import ArticleFormPanel from "./admin/ArticleFormPanel";
 import ArticleListPanel from "./admin/ArticleListPanel";
 import OrgManagementPanel from "./admin/OrgManagementPanel";
+import SubmissionsPanel from "./admin/SubmissionsPanel";
 import UserRolePanel from "./admin/UserRolePanel";
+import MySubmissionsPanel from "./contributor/MySubmissionsPanel";
 
-type AdminPanel = "articles" | "article-form" | "orgs" | "users";
+type AdminPanel =
+  | "articles"
+  | "article-form"
+  | "orgs"
+  | "users"
+  | "submissions";
+type ContributorPanel = "my-drafts" | "contributor-form";
+type DrawerPanel = AdminPanel | ContributorPanel | null;
 
 interface NavDrawerProps {
   open: boolean;
@@ -29,6 +39,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
   const { data: isAdmin } = useIsCallerAdmin();
   const { data: myOrgs = [] } = useGetMyOrgs();
   const { data: superAdmin } = useGetSuperAdmin();
+  const { data: myMemberships = [] } = useGetMyMemberships();
 
   const callerPrincipal = identity?.getPrincipal().toString();
   const isSuperAdmin =
@@ -36,7 +47,10 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
     !!callerPrincipal &&
     superAdmin.toString() === callerPrincipal;
 
-  const [adminPanel, setAdminPanel] = useState<AdminPanel | null>(null);
+  // Contributor = authenticated, non-admin, has at least one org membership
+  const isContributor = isAuthenticated && !isAdmin && myMemberships.length > 0;
+
+  const [activePanel, setActivePanel] = useState<DrawerPanel>(null);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
 
   const handleNav = (path: string) => {
@@ -45,7 +59,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
   };
 
   const handleClose = () => {
-    setAdminPanel(null);
+    setActivePanel(null);
     setEditingArticle(null);
     onClose();
   };
@@ -64,12 +78,9 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
 
   const openEditArticle = (article: Article) => {
     setEditingArticle(article);
-    setAdminPanel("article-form");
-  };
-
-  const openNewArticle = () => {
-    setEditingArticle(null);
-    setAdminPanel("article-form");
+    setActivePanel(
+      activePanel === "my-drafts" ? "contributor-form" : "article-form",
+    );
   };
 
   const navLinks = [
@@ -77,8 +88,14 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
     { label: "Privacy", path: "/privacy", ocid: "nav.privacy.link" },
   ];
 
-  const isAdminView = adminPanel !== null;
+  const isAdminView = activePanel !== null;
   const drawerWidth = isAdminView ? "w-[480px] max-w-[95vw]" : "w-72";
+
+  const getBackTarget = (): DrawerPanel => {
+    if (activePanel === "article-form") return "articles";
+    if (activePanel === "contributor-form") return "my-drafts";
+    return null;
+  };
 
   const panelVariants = {
     initial: { x: "100%", opacity: 0 },
@@ -91,6 +108,10 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
     animate: { x: 0, opacity: 1 },
     exit: { x: 40, opacity: 0 },
   };
+
+  // Determine which orgs to pass to the article form
+  // Contributors get the orgs they're a member of; admins get their own orgs
+  const contributorOrgIds = myMemberships.map((m) => m.orgId);
 
   return (
     <AnimatePresence>
@@ -115,16 +136,19 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-white/20 shrink-0">
-              {adminPanel !== null ? (
+              {activePanel !== null ? (
                 <button
                   type="button"
                   data-ocid="nav.admin.back.button"
                   onClick={() => {
-                    if (adminPanel === "article-form") {
-                      setAdminPanel("articles");
+                    const back = getBackTarget();
+                    setActivePanel(back);
+                    if (
+                      back === null ||
+                      back === "articles" ||
+                      back === "my-drafts"
+                    ) {
                       setEditingArticle(null);
-                    } else {
-                      setAdminPanel(null);
                     }
                   }}
                   className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-xs font-sans uppercase tracking-wider"
@@ -149,7 +173,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
               <AnimatePresence mode="wait">
-                {adminPanel === null && (
+                {activePanel === null && (
                   <motion.div
                     key="nav-main"
                     variants={subPanelVariants}
@@ -200,6 +224,24 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                       </button>
                     )}
 
+                    {/* Contributor section */}
+                    {isContributor && (
+                      <div className="mt-6 pt-4 border-t border-white/10">
+                        <p className="section-label mb-3">Contribute</p>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            type="button"
+                            data-ocid="nav.contributor.drafts.link"
+                            onClick={() => setActivePanel("my-drafts")}
+                            className="text-left text-white/60 hover:text-white font-sans text-sm py-2.5 border-b border-white/10 transition-colors flex items-center justify-between"
+                          >
+                            My Drafts
+                            <span className="text-white/20 text-xs">→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {isAdmin && (
                       <div className="mt-6 pt-4 border-t border-white/10">
                         <div className="flex items-center gap-2 mb-3">
@@ -214,7 +256,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                           <button
                             type="button"
                             data-ocid="nav.admin.articles.link"
-                            onClick={() => setAdminPanel("articles")}
+                            onClick={() => setActivePanel("articles")}
                             className="text-left text-white/60 hover:text-white font-sans text-sm py-2.5 border-b border-white/10 transition-colors flex items-center justify-between"
                           >
                             Articles
@@ -222,8 +264,17 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                           </button>
                           <button
                             type="button"
+                            data-ocid="nav.admin.submissions.link"
+                            onClick={() => setActivePanel("submissions")}
+                            className="text-left text-white/60 hover:text-white font-sans text-sm py-2.5 border-b border-white/10 transition-colors flex items-center justify-between"
+                          >
+                            Submissions
+                            <span className="text-white/20 text-xs">→</span>
+                          </button>
+                          <button
+                            type="button"
                             data-ocid="nav.admin.orgs.link"
-                            onClick={() => setAdminPanel("orgs")}
+                            onClick={() => setActivePanel("orgs")}
                             className="text-left text-white/60 hover:text-white font-sans text-sm py-2.5 border-b border-white/10 transition-colors flex items-center justify-between"
                           >
                             Organisations
@@ -232,7 +283,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                           <button
                             type="button"
                             data-ocid="nav.admin.users.link"
-                            onClick={() => setAdminPanel("users")}
+                            onClick={() => setActivePanel("users")}
                             className="text-left text-white/60 hover:text-white font-sans text-sm py-2.5 border-b border-white/10 transition-colors flex items-center justify-between"
                           >
                             Users
@@ -244,7 +295,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                   </motion.div>
                 )}
 
-                {adminPanel === "articles" && (
+                {activePanel === "articles" && (
                   <motion.div
                     key="admin-articles"
                     variants={subPanelVariants}
@@ -256,12 +307,15 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                   >
                     <ArticleListPanel
                       onEdit={openEditArticle}
-                      onNew={openNewArticle}
+                      onNew={() => {
+                        setEditingArticle(null);
+                        setActivePanel("article-form");
+                      }}
                     />
                   </motion.div>
                 )}
 
-                {adminPanel === "article-form" && (
+                {activePanel === "article-form" && (
                   <motion.div
                     key="admin-article-form"
                     variants={subPanelVariants}
@@ -274,7 +328,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                     <ArticleFormPanel
                       article={editingArticle}
                       onBack={() => {
-                        setAdminPanel("articles");
+                        setActivePanel("articles");
                         setEditingArticle(null);
                       }}
                       orgs={myOrgs}
@@ -282,7 +336,21 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                   </motion.div>
                 )}
 
-                {adminPanel === "orgs" && (
+                {activePanel === "submissions" && (
+                  <motion.div
+                    key="admin-submissions"
+                    variants={subPanelVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ duration: 0.2 }}
+                    className="p-6"
+                  >
+                    <SubmissionsPanel orgs={myOrgs} />
+                  </motion.div>
+                )}
+
+                {activePanel === "orgs" && (
                   <motion.div
                     key="admin-orgs"
                     variants={subPanelVariants}
@@ -296,7 +364,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                   </motion.div>
                 )}
 
-                {adminPanel === "users" && (
+                {activePanel === "users" && (
                   <motion.div
                     key="admin-users"
                     variants={subPanelVariants}
@@ -307,6 +375,49 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                     className="p-6"
                   >
                     <UserRolePanel />
+                  </motion.div>
+                )}
+
+                {activePanel === "my-drafts" && (
+                  <motion.div
+                    key="contributor-drafts"
+                    variants={subPanelVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ duration: 0.2 }}
+                    className="p-6"
+                  >
+                    <MySubmissionsPanel
+                      onEdit={openEditArticle}
+                      onNew={() => {
+                        setEditingArticle(null);
+                        setActivePanel("contributor-form");
+                      }}
+                    />
+                  </motion.div>
+                )}
+
+                {activePanel === "contributor-form" && (
+                  <motion.div
+                    key="contributor-form"
+                    variants={subPanelVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ duration: 0.2 }}
+                    className="p-6"
+                  >
+                    <ArticleFormPanel
+                      article={editingArticle}
+                      onBack={() => {
+                        setActivePanel("my-drafts");
+                        setEditingArticle(null);
+                      }}
+                      orgs={myOrgs}
+                      contributorOrgIds={contributorOrgIds}
+                      isContributorMode
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>

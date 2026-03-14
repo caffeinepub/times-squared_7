@@ -1,6 +1,14 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Article, OrgSection, UserProfile, UserRole } from "../backend.d";
+import type {
+  Article,
+  OrgInvite,
+  OrgMembership,
+  OrgSection,
+  SubmissionWithArticle,
+  UserProfile,
+  UserRole,
+} from "../backend.d";
 import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
 
@@ -261,6 +269,7 @@ export function useCreateArticle() {
       for (const key of articleKeys) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
+      queryClient.invalidateQueries({ queryKey: ["mySubmissions"] });
     },
   });
 }
@@ -300,6 +309,7 @@ export function useUpdateArticle() {
       queryClient.invalidateQueries({
         queryKey: ["article", vars.articleId.toString()],
       });
+      queryClient.invalidateQueries({ queryKey: ["mySubmissions"] });
     },
   });
 }
@@ -316,6 +326,7 @@ export function useDeleteArticle() {
       for (const key of articleKeys) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
+      queryClient.invalidateQueries({ queryKey: ["mySubmissions"] });
     },
   });
 }
@@ -461,6 +472,168 @@ export function useAssignUserRole() {
     mutationFn: async (args: { user: Principal; role: UserRole }) => {
       if (!actor) throw new Error("Actor not available");
       return actor.assignCallerUserRole(args.user, args.role);
+    },
+  });
+}
+
+// ─── Invite & Membership Queries ─────────────────────────────────────────────
+
+export function useGetMyInvites() {
+  const { actor, isFetching } = useActor();
+  const { identity } = useInternetIdentity();
+  return useQuery<OrgInvite[]>({
+    queryKey: ["myInvites"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMyInvites();
+    },
+    enabled: !!actor && !isFetching && !!identity,
+  });
+}
+
+export function useGetMyMemberships() {
+  const { actor, isFetching } = useActor();
+  const { identity } = useInternetIdentity();
+  return useQuery<OrgMembership[]>({
+    queryKey: ["myMemberships"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMyMemberships();
+    },
+    enabled: !!actor && !isFetching && !!identity,
+  });
+}
+
+export function useGetOrgMembers(orgId: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<OrgMembership[]>({
+    queryKey: ["orgMembers", orgId?.toString()],
+    queryFn: async () => {
+      if (!actor || orgId === null) return [];
+      return actor.getOrgMembers(orgId);
+    },
+    enabled: !!actor && !isFetching && orgId !== null,
+  });
+}
+
+export function useInviteUserToOrg() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { orgId: bigint; userPrincipal: Principal }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.inviteUserToOrg(args.orgId, args.userPrincipal);
+    },
+    onSuccess: (_data, args) => {
+      queryClient.invalidateQueries({
+        queryKey: ["orgMembers", args.orgId.toString()],
+      });
+    },
+  });
+}
+
+export function useRemoveOrgMember() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      orgId: bigint;
+      memberPrincipal: Principal;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.removeOrgMember(args.orgId, args.memberPrincipal);
+    },
+    onSuccess: (_data, args) => {
+      queryClient.invalidateQueries({
+        queryKey: ["orgMembers", args.orgId.toString()],
+      });
+    },
+  });
+}
+
+export function useRespondToOrgInvite() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { inviteId: bigint; accept: boolean }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.respondToOrgInvite(args.inviteId, args.accept);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["myInvites"] });
+      queryClient.invalidateQueries({ queryKey: ["myMemberships"] });
+    },
+  });
+}
+
+// ─── B2: Submission Queries ───────────────────────────────────────────────────
+
+export function useGetMySubmissions() {
+  const { actor, isFetching } = useActor();
+  const { identity } = useInternetIdentity();
+  return useQuery<SubmissionWithArticle[]>({
+    queryKey: ["mySubmissions"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMySubmissions();
+    },
+    enabled: !!actor && !isFetching && !!identity,
+  });
+}
+
+export function useGetPendingSubmissions(orgId: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<SubmissionWithArticle[]>({
+    queryKey: ["pendingSubmissions", orgId?.toString()],
+    queryFn: async () => {
+      if (!actor || orgId === null) return [];
+      return actor.getPendingSubmissions(orgId);
+    },
+    enabled: !!actor && !isFetching && orgId !== null,
+  });
+}
+
+export function useSubmitArticleForReview() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (articleId: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.submitArticleForReview(articleId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mySubmissions"] });
+    },
+  });
+}
+
+export function useApproveArticleSubmission() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (articleId: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.approveArticleSubmission(articleId);
+    },
+    onSuccess: () => {
+      for (const key of articleKeys) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["pendingSubmissions"] });
+    },
+  });
+}
+
+export function useRejectArticleSubmission() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { articleId: bigint; note: string | null }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.rejectArticleSubmission(args.articleId, args.note);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pendingSubmissions"] });
     },
   });
 }

@@ -10,6 +10,7 @@ import ArticleCard from "../components/ArticleCard";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetAuthorArticles,
+  useGetMyMemberships,
   useGetOrgs,
   useGetUserProfile,
   useSaveCallerUserProfile,
@@ -26,6 +27,7 @@ export default function AuthorPage({ principal }: AuthorPageProps) {
   const { data: profile, isLoading } = useGetUserProfile(principal);
   const { data: articles = [] } = useGetAuthorArticles(principal);
   const { data: orgs = [] } = useGetOrgs();
+  const { data: myMemberships = [] } = useGetMyMemberships();
   const { mutateAsync: saveProfile, isPending: isSaving } =
     useSaveCallerUserProfile();
 
@@ -99,6 +101,18 @@ export default function AuthorPage({ principal }: AuthorPageProps) {
       toast.error("Save failed");
     }
   };
+
+  // Memberships enriched with org name + slug
+  const enrichedMemberships = myMemberships
+    .map((m) => {
+      const org = orgs.find((o) => o.id === m.orgId);
+      return org ? { ...m, orgName: org.name, orgSlug: org.slug } : null;
+    })
+    .filter(Boolean) as Array<{
+    orgId: bigint;
+    orgName: string;
+    orgSlug: string;
+  }>;
 
   if (isLoading) {
     return (
@@ -296,6 +310,30 @@ export default function AuthorPage({ principal }: AuthorPageProps) {
             ))
           )}
         </section>
+
+        {/* Org Memberships — only visible on own profile */}
+        {isOwnProfile && enrichedMemberships.length > 0 && (
+          <>
+            <div className="divider-white" />
+            <section data-ocid="author.memberships.section" className="py-8">
+              <p className="section-label mb-6">Org Memberships</p>
+              <div className="space-y-2">
+                {enrichedMemberships.map((m, i) => (
+                  <button
+                    key={m.orgId.toString()}
+                    type="button"
+                    data-ocid={`author.membership.link.${i + 1}`}
+                    onClick={() => navigate(`/org/${m.orgSlug}`)}
+                    className="flex items-center gap-3 w-full text-left py-2 text-white/70 hover:text-white transition-colors font-sans text-sm group"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-white/30 group-hover:bg-white/60 transition-colors" />
+                    {m.orgName}
+                  </button>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </motion.main>
   );

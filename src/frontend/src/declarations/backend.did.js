@@ -47,6 +47,24 @@ export const UserProfile = IDL.Record({
   'name' : IDL.Text,
   'avatarBlobId' : IDL.Opt(IDL.Text),
 });
+export const OrgInviteStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'accepted' : IDL.Null,
+  'declined' : IDL.Null,
+});
+export const OrgInvite = IDL.Record({
+  'status' : OrgInviteStatus,
+  'orgId' : IDL.Nat,
+  'inviteId' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'invitedPrincipal' : IDL.Principal,
+  'invitedByPrincipal' : IDL.Principal,
+});
+export const OrgMembership = IDL.Record({
+  'orgId' : IDL.Nat,
+  'memberPrincipal' : IDL.Principal,
+  'joinedAt' : IDL.Int,
+});
 export const OrgSection = IDL.Record({
   'id' : IDL.Nat,
   'bannerBlobId' : IDL.Opt(IDL.Text),
@@ -122,9 +140,12 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getFeaturedArticle' : IDL.Func([], [IDL.Opt(Article)], ['query']),
+  'getMyInvites' : IDL.Func([], [IDL.Vec(OrgInvite)], ['query']),
+  'getMyMemberships' : IDL.Func([], [IDL.Vec(OrgMembership)], ['query']),
   'getMyOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
   'getOrgArticles' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
   'getOrgById' : IDL.Func([IDL.Nat], [OrgSection], ['query']),
+  'getOrgMembers' : IDL.Func([IDL.Nat], [IDL.Vec(OrgMembership)], ['query']),
   'getOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
   'getPublishedArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
   'getSuperAdmin' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
@@ -133,8 +154,12 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'inviteUserToOrg' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'isOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [IDL.Bool], ['query']),
   'publishArticle' : IDL.Func([IDL.Nat], [], []),
+  'removeOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
+  'respondToOrgInvite' : IDL.Func([IDL.Nat, IDL.Bool], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchArticles' : IDL.Func([IDL.Text], [IDL.Vec(Article)], ['query']),
   'unfeatureArticle' : IDL.Func([IDL.Nat], [], []),
@@ -209,6 +234,24 @@ export const idlFactory = ({ IDL }) => {
     'orgId' : IDL.Opt(IDL.Nat),
     'name' : IDL.Text,
     'avatarBlobId' : IDL.Opt(IDL.Text),
+  });
+  const OrgInviteStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'accepted' : IDL.Null,
+    'declined' : IDL.Null,
+  });
+  const OrgInvite = IDL.Record({
+    'status' : OrgInviteStatus,
+    'orgId' : IDL.Nat,
+    'inviteId' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'invitedPrincipal' : IDL.Principal,
+    'invitedByPrincipal' : IDL.Principal,
+  });
+  const OrgMembership = IDL.Record({
+    'orgId' : IDL.Nat,
+    'memberPrincipal' : IDL.Principal,
+    'joinedAt' : IDL.Int,
   });
   const OrgSection = IDL.Record({
     'id' : IDL.Nat,
@@ -285,9 +328,12 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getFeaturedArticle' : IDL.Func([], [IDL.Opt(Article)], ['query']),
+    'getMyInvites' : IDL.Func([], [IDL.Vec(OrgInvite)], ['query']),
+    'getMyMemberships' : IDL.Func([], [IDL.Vec(OrgMembership)], ['query']),
     'getMyOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
     'getOrgArticles' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
     'getOrgById' : IDL.Func([IDL.Nat], [OrgSection], ['query']),
+    'getOrgMembers' : IDL.Func([IDL.Nat], [IDL.Vec(OrgMembership)], ['query']),
     'getOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
     'getPublishedArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
     'getSuperAdmin' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
@@ -296,8 +342,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'inviteUserToOrg' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'isOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [IDL.Bool], ['query']),
     'publishArticle' : IDL.Func([IDL.Nat], [], []),
+    'removeOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
+    'respondToOrgInvite' : IDL.Func([IDL.Nat, IDL.Bool], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchArticles' : IDL.Func([IDL.Text], [IDL.Vec(Article)], ['query']),
     'unfeatureArticle' : IDL.Func([IDL.Nat], [], []),

@@ -55,6 +55,46 @@ actor {
     createdAt : Int;
   };
 
+  type OrgInviteStatus = {
+    #pending;
+    #accepted;
+    #declined;
+  };
+
+  type OrgInvite = {
+    inviteId : Nat;
+    orgId : Nat;
+    invitedPrincipal : Principal;
+    invitedByPrincipal : Principal;
+    status : OrgInviteStatus;
+    createdAt : Int;
+  };
+
+  type OrgMembership = {
+    orgId : Nat;
+    memberPrincipal : Principal;
+    joinedAt : Int;
+  };
+
+  // B2: Submission workflow types
+  type SubmissionStatus = {
+    #draft;
+    #pending_review;
+    #rejected;
+  };
+
+  type ArticleSubmission = {
+    articleId : Nat;
+    submissionStatus : SubmissionStatus;
+    rejectionNote : ?Text;
+    submittedAt : ?Int;
+  };
+
+  type SubmissionWithArticle = {
+    article : Article;
+    submission : ArticleSubmission;
+  };
+
   // State
   include MixinStorage();
   let accessControlState = AccessControl.initState();
@@ -62,6 +102,7 @@ actor {
 
   var articleIdCounter = 0;
   var orgIdCounter = 0;
+  var inviteIdCounter = 0;
 
   var superAdmin : ?Principal = null;
   let orgOwners = Map.empty<Nat, Principal>();
@@ -70,6 +111,11 @@ actor {
   let articles = Map.empty<Nat, Article>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   let organizations = Map.empty<Nat, OrgSection>();
+  let orgInvites = Map.empty<Nat, OrgInvite>();
+  let orgMemberships = Map.empty<Text, OrgMembership>();
+
+  // B2: Separate map for submission state (upgrade-safe -- does not modify Article type)
+  let articleSubmissions = Map.empty<Nat, ArticleSubmission>();
 
   // === HELPER FUNCTIONS ===
 
@@ -109,6 +155,12 @@ actor {
     ownedOrgs.toArray();
   };
 
+  // Check if a principal is a member of an org
+  func isOrgMemberLocal(caller : Principal, orgId : Nat) : Bool {
+    let key = orgId.toText() # "_" # caller.toText();
+    orgMemberships.get(key) != null;
+  };
+
   // === SUPER ADMIN FUNCTIONS ===
 
   public shared ({ caller }) func claimSuperAdmin() : async () {
@@ -123,6 +175,123 @@ actor {
 
   public query func getSuperAdmin() : async ?Principal {
     superAdmin;
+  };
+
+  // === ORG MEMBERSHIP EVENTS ===
+
+  public shared ({ caller }) func inviteUserToOrg(orgId : Nat, userPrincipal : Principal) : async () {
+    validateSuperAdminOrOrgOwner(caller, orgId);
+
+    switch (organizations.get(orgId)) {
+      case (null) { Runtime.trap("Organization does not exist: " # orgId.toText()) };
+      case (?_) {};
+    };
+
+    switch (userProfiles.get(userPrincipal)) {
+      case (null) { Runtime.trap("User does not exist") };
+      case (?_) {};
+    };
+
+    // Check if already member
+    let membershipKey = orgId.toText() # "_" # userPrincipal.toText();
+    switch (orgMemberships.get(membershipKey)) {
+      case (null) {};
+      case (?_) { Runtime.trap("User is already a member of this organization") };
+    };
+
+    // Check if pending invite exists
+    for ((_, invite) in orgInvites.entries()) {
+      if (invite.orgId == orgId and invite.invitedPrincipal == userPrincipal and invite.status == #pending) {
+        Runtime.trap("User already has a pending invite for this organization. Please check your invites.");
+      };
+    };
+
+    let newInvite : OrgInvite = {
+      inviteId = inviteIdCounter;
+      orgId;
+      invitedPrincipal = userPrincipal;
+      invitedByPrincipal = caller;
+      status = #pending;
+      createdAt = Time.now();
+    };
+
+    orgInvites.add(inviteIdCounter, newInvite);
+    inviteIdCounter += 1;
+  };
+
+  public shared ({ caller }) func respondToOrgInvite(inviteId : Nat, accept : Bool) : async () {
+    switch (orgInvites.get(inviteId)) {
+      case (null) { Runtime.trap("Invite not found") };
+      case (?invite) {
+        if (invite.invitedPrincipal != caller) {
+          Runtime.trap("Unauthorized: Only the invited user can respond to this invite");
+        };
+
+        if (invite.status != #pending) {
+          Runtime.trap("Invite has already been responded to");
+        };
+
+        let updatedInvite = { invite with status = if (accept) { #accepted } else { #declined } };
+        orgInvites.add(inviteId, updatedInvite);
+
+        if (accept) {
+          let membershipKey = invite.orgId.toText() # "_" # caller.toText();
+          let newMembership : OrgMembership = {
+            orgId = invite.orgId;
+            memberPrincipal = caller;
+            joinedAt = Time.now();
+          };
+          orgMemberships.add(membershipKey, newMembership);
+        };
+      };
+    };
+  };
+
+  public query ({ caller }) func getMyInvites() : async [OrgInvite] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can get invites");
+    };
+
+    let invites = orgInvites.values().filter(
+     func(invite) { invite.invitedPrincipal == caller and invite.status == #pending }
+    );
+    invites.toArray();
+  };
+
+  public query ({ caller }) func getOrgMembers(orgId : Nat) : async [OrgMembership] {
+    validateSuperAdminOrOrgOwner(caller, orgId);
+
+    let orgMembers = orgMemberships.values().filter(
+      func(membership) { membership.orgId == orgId }
+    );
+    orgMembers.toArray();
+  };
+
+  public shared ({ caller }) func removeOrgMember(orgId : Nat, memberPrincipal : Principal) : async () {
+    validateSuperAdminOrOrgOwner(caller, orgId);
+    let membershipKey = orgId.toText() # "_" # memberPrincipal.toText();
+    switch (orgMemberships.get(membershipKey)) {
+      case (null) { Runtime.trap("Member not found in organization") };
+      case (?_) {
+        orgMemberships.remove(membershipKey);
+      };
+    };
+  };
+
+  public query ({ caller }) func getMyMemberships() : async [OrgMembership] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can get memberships");
+    };
+
+    let memberships = orgMemberships.values().filter(
+      func(membership) { membership.memberPrincipal == caller }
+    );
+    memberships.toArray();
+  };
+
+  public query func isOrgMember(orgId : Nat, user : Principal) : async Bool {
+    let membershipKey = orgId.toText() # "_" # user.toText();
+    orgMemberships.get(membershipKey) != null;
   };
 
   // === ORG MANAGEMENT ===
@@ -224,11 +393,13 @@ actor {
   ) : async Nat {
     switch (organizationId) {
       case (?orgId) {
-        // Article belongs to an org - require super admin or org owner
-        validateSuperAdminOrOrgOwner(caller, orgId);
+        let isAdminOrOwner = isSuperAdmin(caller) or isOrgOwner(caller, orgId);
+        let isMember = isOrgMemberLocal(caller, orgId);
+        if (not isAdminOrOwner and not isMember) {
+          Runtime.trap("Unauthorized: Must be org owner, super admin, or org member to create articles");
+        };
       };
       case (null) {
-        // Article not scoped to org - require admin
         if (not (AccessControl.isAdmin(accessControlState, caller))) {
           Runtime.trap("Unauthorized: Only admins can create articles");
         };
@@ -259,6 +430,25 @@ actor {
     };
 
     articles.add(articleIdCounter, article);
+
+    // B2: If caller is an org member (not admin/owner), create a submission entry
+    switch (organizationId) {
+      case (?orgId) {
+        let isAdminOrOwner = isSuperAdmin(caller) or isOrgOwner(caller, orgId);
+        if (not isAdminOrOwner) {
+          // Contributor draft
+          let submission : ArticleSubmission = {
+            articleId = articleIdCounter;
+            submissionStatus = #draft;
+            rejectionNote = null;
+            submittedAt = null;
+          };
+          articleSubmissions.add(articleIdCounter, submission);
+        };
+      };
+      case (null) {};
+    };
+
     articleIdCounter += 1;
     article.id;
   };
@@ -277,13 +467,21 @@ actor {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
-        switch (existingArticle.organizationId) {
-          case (?orgId) {
-            validateSuperAdminOrOrgOwner(caller, orgId);
-          };
-          case (null) {
-            if (not (AccessControl.isAdmin(accessControlState, caller))) {
-              Runtime.trap("Unauthorized: Only admins can update this article");
+        // Allow original author to edit their own article
+        let isAuthor = switch (existingArticle.authorPrincipal) {
+          case (?ap) { ap == caller };
+          case (null) { false };
+        };
+
+        if (not isAuthor) {
+          switch (existingArticle.organizationId) {
+            case (?orgId) {
+              validateSuperAdminOrOrgOwner(caller, orgId);
+            };
+            case (null) {
+              if (not (AccessControl.isAdmin(accessControlState, caller))) {
+                Runtime.trap("Unauthorized: Only admins can update this article");
+              };
             };
           };
         };
@@ -312,6 +510,17 @@ actor {
         };
 
         articles.add(articleId, updatedArticle);
+
+        // B2: If article had a rejected submission, reset it to draft after edit
+        switch (articleSubmissions.get(articleId)) {
+          case (?sub) {
+            if (sub.submissionStatus == #rejected) {
+              let resetSub = { sub with submissionStatus = #draft; rejectionNote = null };
+              articleSubmissions.add(articleId, resetSub);
+            };
+          };
+          case (null) {};
+        };
       };
     };
   };
@@ -341,15 +550,14 @@ actor {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
-        switch (existingArticle.organizationId) {
-          case (?orgId) {
-            validateSuperAdminOrOrgOwner(caller, orgId);
-          };
-          case (null) {
-            if (not (AccessControl.isAdmin(accessControlState, caller))) {
-              Runtime.trap("Unauthorized: Only admins can unpublish this article");
-            };
-          };
+        // B2: Only original author or super admin can unpublish
+        let isAuthor = switch (existingArticle.authorPrincipal) {
+          case (?ap) { ap == caller };
+          case (null) { false };
+        };
+
+        if (not isAuthor and not isSuperAdmin(caller)) {
+          Runtime.trap("Unauthorized: Only the original author or super admin can unpublish an article");
         };
 
         let updatedArticle = { existingArticle with isPublished = false };
@@ -362,17 +570,27 @@ actor {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
-        switch (existingArticle.organizationId) {
-          case (?orgId) {
-            validateSuperAdminOrOrgOwner(caller, orgId);
-          };
-          case (null) {
-            if (not (AccessControl.isAdmin(accessControlState, caller))) {
-              Runtime.trap("Unauthorized: Only admins can delete this article");
+        // Allow original author to delete their own draft
+        let isAuthor = switch (existingArticle.authorPrincipal) {
+          case (?ap) { ap == caller };
+          case (null) { false };
+        };
+
+        if (not isAuthor) {
+          switch (existingArticle.organizationId) {
+            case (?orgId) {
+              validateSuperAdminOrOrgOwner(caller, orgId);
+            };
+            case (null) {
+              if (not (AccessControl.isAdmin(accessControlState, caller))) {
+                Runtime.trap("Unauthorized: Only admins can delete this article");
+              };
             };
           };
         };
+
         articles.remove(articleId);
+        articleSubmissions.remove(articleId);
       };
     };
   };
@@ -392,11 +610,11 @@ actor {
           };
         };
 
-        // Unfeature all articles first
-        let allArticles = articles.toArray();
-        for ((id, article) in allArticles.values()) {
-          let updatedArticle = { article with isFeatured = false };
-          articles.add(id, updatedArticle);
+        // Unfeature all other articles first
+        for ((id, article) in articles.entries()) {
+          if (article.isFeatured) {
+            articles.add(id, { article with isFeatured = false });
+          };
         };
 
         let updatedArticle = { existingArticle with isFeatured = true };
@@ -426,6 +644,137 @@ actor {
     };
   };
 
+  // === B2: SUBMISSION WORKFLOW ===
+
+  // Contributor submits their draft for review
+  public shared ({ caller }) func submitArticleForReview(articleId : Nat) : async () {
+    switch (articles.get(articleId)) {
+      case (null) { Runtime.trap("Article not found") };
+      case (?article) {
+        // Only original author can submit
+        switch (article.authorPrincipal) {
+          case (?ap) {
+            if (ap != caller) {
+              Runtime.trap("Unauthorized: Only the original author can submit this article");
+            };
+          };
+          case (null) {
+            Runtime.trap("Unauthorized: Article has no author assigned");
+          };
+        };
+
+        switch (articleSubmissions.get(articleId)) {
+          case (null) { Runtime.trap("Article is not a contributor submission") };
+          case (?sub) {
+            if (sub.submissionStatus == #pending_review) {
+              Runtime.trap("Article is already pending review");
+            };
+            let updated = { sub with submissionStatus = #pending_review; submittedAt = ?Time.now() };
+            articleSubmissions.add(articleId, updated);
+          };
+        };
+      };
+    };
+  };
+
+  // Org admin approves a submission -- publishes the article
+  public shared ({ caller }) func approveArticleSubmission(articleId : Nat) : async () {
+    switch (articles.get(articleId)) {
+      case (null) { Runtime.trap("Article not found") };
+      case (?article) {
+        switch (article.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            Runtime.trap("Article does not belong to an organization");
+          };
+        };
+
+        switch (articleSubmissions.get(articleId)) {
+          case (null) { Runtime.trap("Article is not a contributor submission") };
+          case (?_) {
+            // Publish the article and remove submission entry (it is now live)
+            let published = { article with isPublished = true };
+            articles.add(articleId, published);
+            articleSubmissions.remove(articleId);
+          };
+        };
+      };
+    };
+  };
+
+  // Org admin rejects a submission with an optional note
+  public shared ({ caller }) func rejectArticleSubmission(articleId : Nat, note : ?Text) : async () {
+    switch (articles.get(articleId)) {
+      case (null) { Runtime.trap("Article not found") };
+      case (?article) {
+        switch (article.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            Runtime.trap("Article does not belong to an organization");
+          };
+        };
+
+        switch (articleSubmissions.get(articleId)) {
+          case (null) { Runtime.trap("Article is not a contributor submission") };
+          case (?sub) {
+            let updated = { sub with submissionStatus = #rejected; rejectionNote = note };
+            articleSubmissions.add(articleId, updated);
+          };
+        };
+      };
+    };
+  };
+
+  // Contributor sees all their own submitted articles with submission status
+  public query ({ caller }) func getMySubmissions() : async [SubmissionWithArticle] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can get submissions");
+    };
+
+    let result = List.empty<SubmissionWithArticle>();
+    for ((articleId, sub) in articleSubmissions.entries()) {
+      switch (articles.get(articleId)) {
+        case (?article) {
+          let isAuthor = switch (article.authorPrincipal) {
+            case (?ap) { ap == caller };
+            case (null) { false };
+          };
+          if (isAuthor) {
+            result.add({ article; submission = sub });
+          };
+        };
+        case (null) {};
+      };
+    };
+    result.toArray();
+  };
+
+  // Org admin sees pending submissions for their org
+  public query ({ caller }) func getPendingSubmissions(orgId : Nat) : async [SubmissionWithArticle] {
+    validateSuperAdminOrOrgOwner(caller, orgId);
+
+    let result = List.empty<SubmissionWithArticle>();
+    for ((articleId, sub) in articleSubmissions.entries()) {
+      if (sub.submissionStatus == #pending_review) {
+        switch (articles.get(articleId)) {
+          case (?article) {
+            if (article.organizationId == ?orgId) {
+              result.add({ article; submission = sub });
+            };
+          };
+          case (null) {};
+        };
+      };
+    };
+    result.toArray();
+  };
+
+  // === ARTICLE QUERIES ===
+
   public query ({ caller }) func getAllArticles() : async [Article] {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can view all articles");
@@ -442,7 +791,6 @@ actor {
     for (article in articles.values()) {
       switch (article.organizationId) {
         case (?orgId) {
-          // Check if caller owns this org
           if (ownedOrgIds.find<Nat>(func(id) { id == orgId }) != null) {
             myArticles.add(article);
           };
@@ -465,7 +813,7 @@ actor {
     ).toArray().sort();
   };
 
-  // === PUBLIC QUERIES (unchanged) ===
+  // === PUBLIC QUERIES ===
 
   public query func getPublishedArticles() : async [Article] {
     articles.values().filter(

@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect, useState } from "react";
 import Header from "./components/Header";
+import InviteBanner from "./components/InviteBanner";
 import { loadConfig } from "./config";
 import { useSuperAdminClaim } from "./hooks/useSuperAdminClaim";
 import ArticlePage from "./pages/ArticlePage";
@@ -81,7 +82,12 @@ export default function App() {
   return (
     <div className="min-h-screen bg-black flex flex-col">
       <SuperAdminClaimEffect />
-      {showHeader && <Header />}
+      {showHeader && (
+        <>
+          <Header />
+          <InviteBanner />
+        </>
+      )}
       <div className="flex-1">{renderPage()}</div>
 
       {showHeader && (

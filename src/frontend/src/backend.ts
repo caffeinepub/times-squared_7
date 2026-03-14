@@ -89,33 +89,6 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface _CaffeineStorageRefillResult {
-    success?: boolean;
-    topped_up_amount?: bigint;
-}
-export interface _CaffeineStorageRefillInformation {
-    proposed_top_up_amount?: bigint;
-}
-export interface OrgSection {
-    id: bigint;
-    bannerBlobId?: string;
-    name: string;
-    createdAt: bigint;
-    slug: string;
-    description: string;
-    logoBlobId?: string;
-}
-export interface _CaffeineStorageCreateCertificateResult {
-    method: string;
-    blob_hash: string;
-}
-export interface UserProfile {
-    bio: string;
-    principal: Principal;
-    orgId?: bigint;
-    name: string;
-    avatarBlobId?: string;
-}
 export interface Article {
     id: bigint;
     organizationId?: bigint;
@@ -132,10 +105,70 @@ export interface Article {
     heroImageBlobId?: string;
     authorPrincipal?: Principal;
 }
+export interface OrgInvite {
+    status: OrgInviteStatus;
+    orgId: bigint;
+    inviteId: bigint;
+    createdAt: bigint;
+    invitedPrincipal: Principal;
+    invitedByPrincipal: Principal;
+}
+export interface _CaffeineStorageRefillInformation {
+    proposed_top_up_amount?: bigint;
+}
+export interface OrgSection {
+    id: bigint;
+    bannerBlobId?: string;
+    name: string;
+    createdAt: bigint;
+    slug: string;
+    description: string;
+    logoBlobId?: string;
+}
+export interface OrgMembership {
+    orgId: bigint;
+    memberPrincipal: Principal;
+    joinedAt: bigint;
+}
+export interface _CaffeineStorageCreateCertificateResult {
+    method: string;
+    blob_hash: string;
+}
+export interface UserProfile {
+    bio: string;
+    principal: Principal;
+    orgId?: bigint;
+    name: string;
+    avatarBlobId?: string;
+}
+export interface _CaffeineStorageRefillResult {
+    success?: boolean;
+    topped_up_amount?: bigint;
+}
+export enum OrgInviteStatus {
+    pending = "pending",
+    accepted = "accepted",
+    declined = "declined"
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
     guest = "guest"
+}
+export enum SubmissionStatus {
+    draft = "draft",
+    pending_review = "pending_review",
+    rejected = "rejected"
+}
+export interface ArticleSubmission {
+    articleId: bigint;
+    submissionStatus: SubmissionStatus;
+    rejectionNote?: string;
+    submittedAt?: bigint;
+}
+export interface SubmissionWithArticle {
+    article: Article;
+    submission: ArticleSubmission;
 }
 export interface backendInterface {
     _caffeineStorageBlobIsLive(hash: Uint8Array): Promise<boolean>;
@@ -160,23 +193,35 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getFeaturedArticle(): Promise<Article | null>;
+    getMyInvites(): Promise<Array<OrgInvite>>;
+    getMyMemberships(): Promise<Array<OrgMembership>>;
     getMyOrgs(): Promise<Array<OrgSection>>;
     getOrgArticles(orgId: bigint): Promise<Array<Article>>;
     getOrgById(orgId: bigint): Promise<OrgSection>;
+    getOrgMembers(orgId: bigint): Promise<Array<OrgMembership>>;
     getOrgs(): Promise<Array<OrgSection>>;
     getPublishedArticles(): Promise<Array<Article>>;
     getSuperAdmin(): Promise<Principal | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    inviteUserToOrg(orgId: bigint, userPrincipal: Principal): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
+    isOrgMember(orgId: bigint, user: Principal): Promise<boolean>;
     publishArticle(articleId: bigint): Promise<void>;
+    removeOrgMember(orgId: bigint, memberPrincipal: Principal): Promise<void>;
+    respondToOrgInvite(inviteId: bigint, accept: boolean): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchArticles(queryText: string): Promise<Array<Article>>;
     unfeatureArticle(articleId: bigint): Promise<void>;
     unpublishArticle(articleId: bigint): Promise<void>;
     updateArticle(articleId: bigint, title: string, author: string, organizationId: bigint | null, publicationDate: string, heroImageBlobId: string | null, heroImageBlobId2: string | null, bodyContent: string, tags: Array<string>): Promise<void>;
     updateOrg(orgId: bigint, name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<void>;
+    getMySubmissions(): Promise<Array<SubmissionWithArticle>>;
+    getPendingSubmissions(orgId: bigint): Promise<Array<SubmissionWithArticle>>;
+    submitArticleForReview(articleId: bigint): Promise<void>;
+    approveArticleSubmission(articleId: bigint): Promise<void>;
+    rejectArticleSubmission(articleId: bigint, note: string | null): Promise<void>;
 }
-import type { Article as _Article, OrgSection as _OrgSection, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
+import type { Article as _Article, OrgInvite as _OrgInvite, OrgInviteStatus as _OrgInviteStatus, OrgSection as _OrgSection, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _caffeineStorageBlobIsLive(arg0: Uint8Array): Promise<boolean> {
@@ -487,18 +532,46 @@ export class Backend implements backendInterface {
             return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getMyOrgs(): Promise<Array<OrgSection>> {
+    async getMyInvites(): Promise<Array<OrgInvite>> {
         if (this.processError) {
             try {
-                const result = await this.actor.getMyOrgs();
+                const result = await this.actor.getMyInvites();
                 return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getMyOrgs();
+            const result = await this.actor.getMyInvites();
             return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getMyMemberships(): Promise<Array<OrgMembership>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyMemberships();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyMemberships();
+            return result;
+        }
+    }
+    async getMyOrgs(): Promise<Array<OrgSection>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyOrgs();
+                return from_candid_vec_n29(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyOrgs();
+            return from_candid_vec_n29(this._uploadFile, this._downloadFile, result);
         }
     }
     async getOrgArticles(arg0: bigint): Promise<Array<Article>> {
@@ -519,28 +592,42 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getOrgById(arg0);
-                return from_candid_OrgSection_n25(this._uploadFile, this._downloadFile, result);
+                return from_candid_OrgSection_n30(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getOrgById(arg0);
-            return from_candid_OrgSection_n25(this._uploadFile, this._downloadFile, result);
+            return from_candid_OrgSection_n30(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getOrgMembers(arg0: bigint): Promise<Array<OrgMembership>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getOrgMembers(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getOrgMembers(arg0);
+            return result;
         }
     }
     async getOrgs(): Promise<Array<OrgSection>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getOrgs();
-                return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n29(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getOrgs();
-            return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n29(this._uploadFile, this._downloadFile, result);
         }
     }
     async getPublishedArticles(): Promise<Array<Article>> {
@@ -585,6 +672,20 @@ export class Backend implements backendInterface {
             return from_candid_opt_n18(this._uploadFile, this._downloadFile, result);
         }
     }
+    async inviteUserToOrg(arg0: bigint, arg1: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.inviteUserToOrg(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.inviteUserToOrg(arg0, arg1);
+            return result;
+        }
+    }
     async isCallerAdmin(): Promise<boolean> {
         if (this.processError) {
             try {
@@ -596,6 +697,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.isCallerAdmin();
+            return result;
+        }
+    }
+    async isOrgMember(arg0: bigint, arg1: Principal): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isOrgMember(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isOrgMember(arg0, arg1);
             return result;
         }
     }
@@ -613,17 +728,45 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
+    async removeOrgMember(arg0: bigint, arg1: Principal): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n27(this._uploadFile, this._downloadFile, arg0));
+                const result = await this.actor.removeOrgMember(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n27(this._uploadFile, this._downloadFile, arg0));
+            const result = await this.actor.removeOrgMember(arg0, arg1);
+            return result;
+        }
+    }
+    async respondToOrgInvite(arg0: bigint, arg1: boolean): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.respondToOrgInvite(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.respondToOrgInvite(arg0, arg1);
+            return result;
+        }
+    }
+    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n32(this._uploadFile, this._downloadFile, arg0));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n32(this._uploadFile, this._downloadFile, arg0));
             return result;
         }
     }
@@ -697,12 +840,41 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getMySubmissions(): Promise<Array<SubmissionWithArticle>> {
+        const result = await (this.actor as any).getMySubmissions();
+        return result.map((item: any) => ({
+            article: from_candid_Article_n14(this._uploadFile, this._downloadFile, item.article),
+            submission: { articleId: item.submission.articleId, submissionStatus: Object.keys(item.submission.submissionStatus)[0] as SubmissionStatus, rejectionNote: item.submission.rejectionNote?.[0] ?? undefined, submittedAt: item.submission.submittedAt?.[0] ?? undefined }
+        }));
+    }
+    async getPendingSubmissions(arg0: bigint): Promise<Array<SubmissionWithArticle>> {
+        const result = await (this.actor as any).getPendingSubmissions(arg0);
+        return result.map((item: any) => ({
+            article: from_candid_Article_n14(this._uploadFile, this._downloadFile, item.article),
+            submission: { articleId: item.submission.articleId, submissionStatus: Object.keys(item.submission.submissionStatus)[0] as SubmissionStatus, rejectionNote: item.submission.rejectionNote?.[0] ?? undefined, submittedAt: item.submission.submittedAt?.[0] ?? undefined }
+        }));
+    }
+    async submitArticleForReview(arg0: bigint): Promise<void> {
+        await (this.actor as any).submitArticleForReview(arg0);
+    }
+    async approveArticleSubmission(arg0: bigint): Promise<void> {
+        await (this.actor as any).approveArticleSubmission(arg0);
+    }
+    async rejectArticleSubmission(arg0: bigint, arg1: string | null): Promise<void> {
+        await (this.actor as any).rejectArticleSubmission(arg0, arg1 ? [arg1] : []);
+    }
 }
 function from_candid_Article_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Article): Article {
     return from_candid_record_n15(_uploadFile, _downloadFile, value);
 }
-function from_candid_OrgSection_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgSection): OrgSection {
+function from_candid_OrgInviteStatus_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgInviteStatus): OrgInviteStatus {
+    return from_candid_variant_n28(_uploadFile, _downloadFile, value);
+}
+function from_candid_OrgInvite_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgInvite): OrgInvite {
     return from_candid_record_n26(_uploadFile, _downloadFile, value);
+}
+function from_candid_OrgSection_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgSection): OrgSection {
+    return from_candid_record_n31(_uploadFile, _downloadFile, value);
 }
 function from_candid_UserProfile_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
     return from_candid_record_n20(_uploadFile, _downloadFile, value);
@@ -801,6 +973,30 @@ function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promise<Uin
     };
 }
 function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    status: _OrgInviteStatus;
+    orgId: bigint;
+    inviteId: bigint;
+    createdAt: bigint;
+    invitedPrincipal: Principal;
+    invitedByPrincipal: Principal;
+}): {
+    status: OrgInviteStatus;
+    orgId: bigint;
+    inviteId: bigint;
+    createdAt: bigint;
+    invitedPrincipal: Principal;
+    invitedByPrincipal: Principal;
+} {
+    return {
+        status: from_candid_OrgInviteStatus_n27(_uploadFile, _downloadFile, value.status),
+        orgId: value.orgId,
+        inviteId: value.inviteId,
+        createdAt: value.createdAt,
+        invitedPrincipal: value.invitedPrincipal,
+        invitedByPrincipal: value.invitedByPrincipal
+    };
+}
+function from_candid_record_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     bannerBlobId: [] | [string];
     name: string;
@@ -848,14 +1044,26 @@ function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole {
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
 }
+function from_candid_variant_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    pending: null;
+} | {
+    accepted: null;
+} | {
+    declined: null;
+}): OrgInviteStatus {
+    return "pending" in value ? OrgInviteStatus.pending : "accepted" in value ? OrgInviteStatus.accepted : "declined" in value ? OrgInviteStatus.declined : value;
+}
 function from_candid_vec_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Article>): Array<Article> {
     return value.map((x)=>from_candid_Article_n14(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_OrgSection>): Array<OrgSection> {
-    return value.map((x)=>from_candid_OrgSection_n25(_uploadFile, _downloadFile, x));
+function from_candid_vec_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_OrgInvite>): Array<OrgInvite> {
+    return value.map((x)=>from_candid_OrgInvite_n25(_uploadFile, _downloadFile, x));
 }
-function to_candid_UserProfile_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
-    return to_candid_record_n28(_uploadFile, _downloadFile, value);
+function from_candid_vec_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_OrgSection>): Array<OrgSection> {
+    return value.map((x)=>from_candid_OrgSection_n30(_uploadFile, _downloadFile, x));
+}
+function to_candid_UserProfile_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
+    return to_candid_record_n33(_uploadFile, _downloadFile, value);
 }
 function to_candid_UserRole_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n9(_uploadFile, _downloadFile, value);
@@ -875,7 +1083,16 @@ function to_candid_opt_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Arr
 function to_candid_opt_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
     return value === null ? candid_none() : candid_some(value);
 }
-function to_candid_record_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    proposed_top_up_amount?: bigint;
+}): {
+    proposed_top_up_amount: [] | [bigint];
+} {
+    return {
+        proposed_top_up_amount: value.proposed_top_up_amount ? candid_some(value.proposed_top_up_amount) : candid_none()
+    };
+}
+function to_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     bio: string;
     principal: Principal;
     orgId?: bigint;
@@ -894,15 +1111,6 @@ function to_candid_record_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         orgId: value.orgId ? candid_some(value.orgId) : candid_none(),
         name: value.name,
         avatarBlobId: value.avatarBlobId ? candid_some(value.avatarBlobId) : candid_none()
-    };
-}
-function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    proposed_top_up_amount?: bigint;
-}): {
-    proposed_top_up_amount: [] | [bigint];
-} {
-    return {
-        proposed_top_up_amount: value.proposed_top_up_amount ? candid_some(value.proposed_top_up_amount) : candid_none()
     };
 }
 function to_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {

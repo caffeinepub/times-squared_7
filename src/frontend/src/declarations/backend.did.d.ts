@@ -26,6 +26,22 @@ export interface Article {
   'heroImageBlobId' : [] | [string],
   'authorPrincipal' : [] | [Principal],
 }
+export interface OrgInvite {
+  'status' : OrgInviteStatus,
+  'orgId' : bigint,
+  'inviteId' : bigint,
+  'createdAt' : bigint,
+  'invitedPrincipal' : Principal,
+  'invitedByPrincipal' : Principal,
+}
+export type OrgInviteStatus = { 'pending' : null } |
+  { 'accepted' : null } |
+  { 'declined' : null };
+export interface OrgMembership {
+  'orgId' : bigint,
+  'memberPrincipal' : Principal,
+  'joinedAt' : bigint,
+}
 export interface OrgSection {
   'id' : bigint,
   'bannerBlobId' : [] | [string],
@@ -104,15 +120,22 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getFeaturedArticle' : ActorMethod<[], [] | [Article]>,
+  'getMyInvites' : ActorMethod<[], Array<OrgInvite>>,
+  'getMyMemberships' : ActorMethod<[], Array<OrgMembership>>,
   'getMyOrgs' : ActorMethod<[], Array<OrgSection>>,
   'getOrgArticles' : ActorMethod<[bigint], Array<Article>>,
   'getOrgById' : ActorMethod<[bigint], OrgSection>,
+  'getOrgMembers' : ActorMethod<[bigint], Array<OrgMembership>>,
   'getOrgs' : ActorMethod<[], Array<OrgSection>>,
   'getPublishedArticles' : ActorMethod<[], Array<Article>>,
   'getSuperAdmin' : ActorMethod<[], [] | [Principal]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'inviteUserToOrg' : ActorMethod<[bigint, Principal], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'isOrgMember' : ActorMethod<[bigint, Principal], boolean>,
   'publishArticle' : ActorMethod<[bigint], undefined>,
+  'removeOrgMember' : ActorMethod<[bigint, Principal], undefined>,
+  'respondToOrgInvite' : ActorMethod<[bigint, boolean], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchArticles' : ActorMethod<[string], Array<Article>>,
   'unfeatureArticle' : ActorMethod<[bigint], undefined>,
