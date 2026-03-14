@@ -86,6 +86,7 @@ export const idlService = IDL.Service({
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'claimSuperAdmin' : IDL.Func([], [], []),
   'createArticle' : IDL.Func(
       [
         IDL.Text,
@@ -121,9 +122,12 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getFeaturedArticle' : IDL.Func([], [IDL.Opt(Article)], ['query']),
+  'getMyOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
+  'getOrgArticles' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
   'getOrgById' : IDL.Func([IDL.Nat], [OrgSection], ['query']),
   'getOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
   'getPublishedArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
+  'getSuperAdmin' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -245,6 +249,7 @@ export const idlFactory = ({ IDL }) => {
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'claimSuperAdmin' : IDL.Func([], [], []),
     'createArticle' : IDL.Func(
         [
           IDL.Text,
@@ -280,9 +285,12 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getFeaturedArticle' : IDL.Func([], [IDL.Opt(Article)], ['query']),
+    'getMyOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
+    'getOrgArticles' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
     'getOrgById' : IDL.Func([IDL.Nat], [OrgSection], ['query']),
     'getOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
     'getPublishedArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
+    'getSuperAdmin' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],

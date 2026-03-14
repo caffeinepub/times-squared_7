@@ -2,6 +2,7 @@ import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Article, OrgSection, UserProfile, UserRole } from "../backend.d";
 import { useActor } from "./useActor";
+import { useInternetIdentity } from "./useInternetIdentity";
 
 export function useGetPublishedArticles() {
   const { actor, isFetching } = useActor();
@@ -100,6 +101,19 @@ export function useGetOrgs() {
   });
 }
 
+export function useGetMyOrgs() {
+  const { actor, isFetching } = useActor();
+  const { identity } = useInternetIdentity();
+  return useQuery<OrgSection[]>({
+    queryKey: ["myOrgs"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMyOrgs();
+    },
+    enabled: !!actor && !isFetching && !!identity,
+  });
+}
+
 export function useGetOrgById(orgId: bigint | null) {
   const { actor, isFetching } = useActor();
   return useQuery<OrgSection | null>({
@@ -155,6 +169,33 @@ export function useIsCallerAdmin() {
   });
 }
 
+export function useGetSuperAdmin() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Principal | null>({
+    queryKey: ["superAdmin"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getSuperAdmin();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useClaimSuperAdmin() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.claimSuperAdmin();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superAdmin"] });
+      queryClient.invalidateQueries({ queryKey: ["isAdmin"] });
+    },
+  });
+}
+
 export function useSaveCallerUserProfile() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -164,7 +205,6 @@ export function useSaveCallerUserProfile() {
       await actor.saveCallerUserProfile(profile);
     },
     onSuccess: (_data, vars) => {
-      // Invalidate both the caller profile and the specific user profile
       queryClient.invalidateQueries({ queryKey: ["callerProfile"] });
       queryClient.invalidateQueries({
         queryKey: ["userProfile", vars.principal.toString()],
@@ -366,6 +406,7 @@ export function useCreateOrg() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgs"] });
+      queryClient.invalidateQueries({ queryKey: ["myOrgs"] });
     },
   });
 }
@@ -394,6 +435,7 @@ export function useUpdateOrg() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgs"] });
+      queryClient.invalidateQueries({ queryKey: ["myOrgs"] });
     },
   });
 }
@@ -408,6 +450,7 @@ export function useDeleteOrg() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orgs"] });
+      queryClient.invalidateQueries({ queryKey: ["myOrgs"] });
     },
   });
 }

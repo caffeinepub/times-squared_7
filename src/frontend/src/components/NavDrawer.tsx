@@ -4,7 +4,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import type { Article } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useGetOrgs, useIsCallerAdmin } from "../hooks/useQueries";
+import {
+  useGetMyOrgs,
+  useGetSuperAdmin,
+  useIsCallerAdmin,
+} from "../hooks/useQueries";
 import { navigate } from "../lib/navigate";
 import ArticleFormPanel from "./admin/ArticleFormPanel";
 import ArticleListPanel from "./admin/ArticleListPanel";
@@ -23,7 +27,14 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
   const queryClient = useQueryClient();
   const isAuthenticated = !!identity;
   const { data: isAdmin } = useIsCallerAdmin();
-  const { data: orgs = [] } = useGetOrgs();
+  const { data: myOrgs = [] } = useGetMyOrgs();
+  const { data: superAdmin } = useGetSuperAdmin();
+
+  const callerPrincipal = identity?.getPrincipal().toString();
+  const isSuperAdmin =
+    !!superAdmin &&
+    !!callerPrincipal &&
+    superAdmin.toString() === callerPrincipal;
 
   const [adminPanel, setAdminPanel] = useState<AdminPanel | null>(null);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
@@ -191,7 +202,14 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
 
                     {isAdmin && (
                       <div className="mt-6 pt-4 border-t border-white/10">
-                        <p className="section-label mb-3">Admin</p>
+                        <div className="flex items-center gap-2 mb-3">
+                          <p className="section-label">Admin</p>
+                          {isSuperAdmin && (
+                            <span className="text-[9px] font-sans uppercase tracking-widest bg-white/10 text-white/50 px-2 py-0.5">
+                              Super
+                            </span>
+                          )}
+                        </div>
                         <div className="flex flex-col gap-1">
                           <button
                             type="button"
@@ -259,7 +277,7 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                         setAdminPanel("articles");
                         setEditingArticle(null);
                       }}
-                      orgs={orgs}
+                      orgs={myOrgs}
                     />
                   </motion.div>
                 )}

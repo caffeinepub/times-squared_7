@@ -74,6 +74,7 @@ export interface _SERVICE {
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'claimSuperAdmin' : ActorMethod<[], undefined>,
   'createArticle' : ActorMethod<
     [
       string,
@@ -103,9 +104,12 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getFeaturedArticle' : ActorMethod<[], [] | [Article]>,
+  'getMyOrgs' : ActorMethod<[], Array<OrgSection>>,
+  'getOrgArticles' : ActorMethod<[bigint], Array<Article>>,
   'getOrgById' : ActorMethod<[bigint], OrgSection>,
   'getOrgs' : ActorMethod<[], Array<OrgSection>>,
   'getPublishedArticles' : ActorMethod<[], Array<Article>>,
+  'getSuperAdmin' : ActorMethod<[], [] | [Principal]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'publishArticle' : ActorMethod<[bigint], undefined>,

@@ -146,6 +146,7 @@ export interface backendInterface {
     _caffeineStorageUpdateGatewayPrincipals(): Promise<void>;
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    claimSuperAdmin(): Promise<void>;
     createArticle(title: string, author: string, authorPrincipal: Principal | null, organizationId: bigint | null, publicationDate: string, heroImageBlobId: string | null, heroImageBlobId2: string | null, bodyContent: string, tags: Array<string>): Promise<bigint>;
     createOrg(name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<bigint>;
     deleteArticle(articleId: bigint): Promise<void>;
@@ -159,9 +160,12 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getFeaturedArticle(): Promise<Article | null>;
+    getMyOrgs(): Promise<Array<OrgSection>>;
+    getOrgArticles(orgId: bigint): Promise<Array<Article>>;
     getOrgById(orgId: bigint): Promise<OrgSection>;
     getOrgs(): Promise<Array<OrgSection>>;
     getPublishedArticles(): Promise<Array<Article>>;
+    getSuperAdmin(): Promise<Principal | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     publishArticle(articleId: bigint): Promise<void>;
@@ -284,6 +288,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n8(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async claimSuperAdmin(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.claimSuperAdmin();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.claimSuperAdmin();
             return result;
         }
     }
@@ -469,32 +487,60 @@ export class Backend implements backendInterface {
             return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getMyOrgs(): Promise<Array<OrgSection>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMyOrgs();
+                return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMyOrgs();
+            return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getOrgArticles(arg0: bigint): Promise<Array<Article>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getOrgArticles(arg0);
+                return from_candid_vec_n13(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getOrgArticles(arg0);
+            return from_candid_vec_n13(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getOrgById(arg0: bigint): Promise<OrgSection> {
         if (this.processError) {
             try {
                 const result = await this.actor.getOrgById(arg0);
-                return from_candid_OrgSection_n24(this._uploadFile, this._downloadFile, result);
+                return from_candid_OrgSection_n25(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getOrgById(arg0);
-            return from_candid_OrgSection_n24(this._uploadFile, this._downloadFile, result);
+            return from_candid_OrgSection_n25(this._uploadFile, this._downloadFile, result);
         }
     }
     async getOrgs(): Promise<Array<OrgSection>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getOrgs();
-                return from_candid_vec_n26(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getOrgs();
-            return from_candid_vec_n26(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
         }
     }
     async getPublishedArticles(): Promise<Array<Article>> {
@@ -509,6 +555,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getPublishedArticles();
             return from_candid_vec_n13(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getSuperAdmin(): Promise<Principal | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getSuperAdmin();
+                return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getSuperAdmin();
+            return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
         }
     }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
@@ -641,8 +701,8 @@ export class Backend implements backendInterface {
 function from_candid_Article_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Article): Article {
     return from_candid_record_n15(_uploadFile, _downloadFile, value);
 }
-function from_candid_OrgSection_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgSection): OrgSection {
-    return from_candid_record_n25(_uploadFile, _downloadFile, value);
+function from_candid_OrgSection_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgSection): OrgSection {
+    return from_candid_record_n26(_uploadFile, _downloadFile, value);
 }
 function from_candid_UserProfile_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
     return from_candid_record_n20(_uploadFile, _downloadFile, value);
@@ -740,7 +800,7 @@ function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promise<Uin
         avatarBlobId: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.avatarBlobId))
     };
 }
-function from_candid_record_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     bannerBlobId: [] | [string];
     name: string;
@@ -791,8 +851,8 @@ function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Ui
 function from_candid_vec_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Article>): Array<Article> {
     return value.map((x)=>from_candid_Article_n14(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_OrgSection>): Array<OrgSection> {
-    return value.map((x)=>from_candid_OrgSection_n24(_uploadFile, _downloadFile, x));
+function from_candid_vec_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_OrgSection>): Array<OrgSection> {
+    return value.map((x)=>from_candid_OrgSection_n25(_uploadFile, _downloadFile, x));
 }
 function to_candid_UserProfile_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
     return to_candid_record_n28(_uploadFile, _downloadFile, value);

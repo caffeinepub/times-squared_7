@@ -63,12 +63,154 @@ actor {
   var articleIdCounter = 0;
   var orgIdCounter = 0;
 
+  var superAdmin : ?Principal = null;
+  let orgOwners = Map.empty<Nat, Principal>();
+
   // Storage
   let articles = Map.empty<Nat, Article>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   let organizations = Map.empty<Nat, OrgSection>();
 
-  // Article Functions
+  // === HELPER FUNCTIONS ===
+
+  func isSuperAdmin(caller : Principal) : Bool {
+    switch (superAdmin) {
+      case (?admin) { admin == caller };
+      case (null) { false };
+    };
+  };
+
+  func isOrgOwner(caller : Principal, orgId : Nat) : Bool {
+    switch (orgOwners.get(orgId)) {
+      case (?owner) { owner == caller };
+      case (null) { false };
+    };
+  };
+
+  func validateOrgOwner(caller : Principal, orgId : Nat) {
+    if (not isOrgOwner(caller, orgId)) {
+      Runtime.trap("Unauthorized: Only the organization owner can perform this action");
+    };
+  };
+
+  func validateSuperAdminOrOrgOwner(caller : Principal, orgId : Nat) {
+    if (not isSuperAdmin(caller) and not isOrgOwner(caller, orgId)) {
+      Runtime.trap("Unauthorized: Only super admin or organization owner can perform this action");
+    };
+  };
+
+  func getOwnedOrgIds(caller : Principal) : [Nat] {
+    let ownedOrgs = List.empty<Nat>();
+    for ((orgId, owner) in orgOwners.entries()) {
+      if (owner == caller) {
+        ownedOrgs.add(orgId);
+      };
+    };
+    ownedOrgs.toArray();
+  };
+
+  // === SUPER ADMIN FUNCTIONS ===
+
+  public shared ({ caller }) func claimSuperAdmin() : async () {
+    switch (superAdmin) {
+      case (null) {
+        superAdmin := ?caller;
+        AccessControl.initialize(accessControlState, caller, "hardcoded-token", "");
+      };
+      case (_) { Runtime.trap("Super admin already claimed") };
+    };
+  };
+
+  public query func getSuperAdmin() : async ?Principal {
+    superAdmin;
+  };
+
+  // === ORG MANAGEMENT ===
+
+  public shared ({ caller }) func createOrg(
+    name : Text,
+    slug : Text,
+    description : Text,
+    logoBlobId : ?Text,
+    bannerBlobId : ?Text,
+  ) : async Nat {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can create organizations");
+    };
+
+    let org : OrgSection = {
+      id = orgIdCounter;
+      name;
+      slug;
+      description;
+      logoBlobId;
+      bannerBlobId;
+      createdAt = Time.now();
+    };
+
+    organizations.add(orgIdCounter, org);
+    orgOwners.add(orgIdCounter, caller);
+    orgIdCounter += 1;
+    org.id;
+  };
+
+  public shared ({ caller }) func updateOrg(
+    orgId : Nat,
+    name : Text,
+    slug : Text,
+    description : Text,
+    logoBlobId : ?Text,
+    bannerBlobId : ?Text,
+  ) : async () {
+    validateSuperAdminOrOrgOwner(caller, orgId);
+    switch (organizations.get(orgId)) {
+      case (null) { Runtime.trap("Organization not found") };
+      case (?existingOrg) {
+        let updatedOrg : OrgSection = {
+          id = existingOrg.id;
+          name;
+          slug;
+          description;
+          logoBlobId;
+          bannerBlobId;
+          createdAt = existingOrg.createdAt;
+        };
+
+        organizations.add(orgId, updatedOrg);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteOrg(orgId : Nat) : async () {
+    validateSuperAdminOrOrgOwner(caller, orgId);
+    organizations.remove(orgId);
+    orgOwners.remove(orgId);
+  };
+
+  public query ({ caller }) func getMyOrgs() : async [OrgSection] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can view their organizations");
+    };
+
+    if (isSuperAdmin(caller)) {
+      // Super admin sees all orgs
+      return organizations.values().toArray();
+    };
+
+    // Regular admin sees only owned orgs
+    let ownedOrgIds = getOwnedOrgIds(caller);
+    let myOrgs = List.empty<OrgSection>();
+    for (orgId in ownedOrgIds.values()) {
+      switch (organizations.get(orgId)) {
+        case (?org) { myOrgs.add(org) };
+        case (null) {};
+      };
+    };
+    myOrgs.toArray();
+  };
+
+  // === ARTICLE MANAGEMENT ===
+
   public shared ({ caller }) func createArticle(
     title : Text,
     author : Text,
@@ -80,8 +222,17 @@ actor {
     bodyContent : Text,
     tags : [Text],
   ) : async Nat {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can create articles");
+    switch (organizationId) {
+      case (?orgId) {
+        // Article belongs to an org - require super admin or org owner
+        validateSuperAdminOrOrgOwner(caller, orgId);
+      };
+      case (null) {
+        // Article not scoped to org - require admin
+        if (not (AccessControl.isAdmin(accessControlState, caller))) {
+          Runtime.trap("Unauthorized: Only admins can create articles");
+        };
+      };
     };
 
     let excerpt = if (bodyContent.size() > 200) {
@@ -123,13 +274,20 @@ actor {
     bodyContent : Text,
     tags : [Text],
   ) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can update articles");
-    };
-
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
+        switch (existingArticle.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              Runtime.trap("Unauthorized: Only admins can update this article");
+            };
+          };
+        };
+
         let excerpt = if (bodyContent.size() > 200) {
           bodyContent.toArray().sliceToArray(0, 200).toText();
         } else {
@@ -159,13 +317,20 @@ actor {
   };
 
   public shared ({ caller }) func publishArticle(articleId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can publish articles");
-    };
-
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
+        switch (existingArticle.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              Runtime.trap("Unauthorized: Only admins can publish this article");
+            };
+          };
+        };
+
         let updatedArticle = { existingArticle with isPublished = true };
         articles.add(articleId, updatedArticle);
       };
@@ -173,13 +338,20 @@ actor {
   };
 
   public shared ({ caller }) func unpublishArticle(articleId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can unpublish articles");
-    };
-
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
+        switch (existingArticle.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              Runtime.trap("Unauthorized: Only admins can unpublish this article");
+            };
+          };
+        };
+
         let updatedArticle = { existingArticle with isPublished = false };
         articles.add(articleId, updatedArticle);
       };
@@ -187,28 +359,46 @@ actor {
   };
 
   public shared ({ caller }) func deleteArticle(articleId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can delete articles");
-    };
-    articles.remove(articleId);
-  };
-
-  public shared ({ caller }) func featureArticle(articleId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can feature articles");
-    };
-
-    // Unfeature all articles first
-    let allArticles = articles.toArray();
-    for ((id, article) in allArticles.values()) {
-      let updatedArticle = { article with isFeatured = false };
-      articles.add(id, updatedArticle);
-    };
-
-    // Feature the specified article
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
+        switch (existingArticle.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              Runtime.trap("Unauthorized: Only admins can delete this article");
+            };
+          };
+        };
+        articles.remove(articleId);
+      };
+    };
+  };
+
+  public shared ({ caller }) func featureArticle(articleId : Nat) : async () {
+    switch (articles.get(articleId)) {
+      case (null) { Runtime.trap("Article not found") };
+      case (?existingArticle) {
+        switch (existingArticle.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              Runtime.trap("Unauthorized: Only admins can feature this article");
+            };
+          };
+        };
+
+        // Unfeature all articles first
+        let allArticles = articles.toArray();
+        for ((id, article) in allArticles.values()) {
+          let updatedArticle = { article with isFeatured = false };
+          articles.add(id, updatedArticle);
+        };
+
         let updatedArticle = { existingArticle with isFeatured = true };
         articles.add(articleId, updatedArticle);
       };
@@ -216,20 +406,67 @@ actor {
   };
 
   public shared ({ caller }) func unfeatureArticle(articleId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can unfeature articles");
-    };
-
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
+        switch (existingArticle.organizationId) {
+          case (?orgId) {
+            validateSuperAdminOrOrgOwner(caller, orgId);
+          };
+          case (null) {
+            if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              Runtime.trap("Unauthorized: Only admins can unfeature this article");
+            };
+          };
+        };
+
         let updatedArticle = { existingArticle with isFeatured = false };
         articles.add(articleId, updatedArticle);
       };
     };
   };
 
-  // Query Functions
+  public query ({ caller }) func getAllArticles() : async [Article] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can view all articles");
+    };
+
+    if (isSuperAdmin(caller)) {
+      // Super admin sees all articles
+      return articles.values().toArray().sort();
+    };
+
+    // Regular admin sees only articles in orgs they own
+    let ownedOrgIds = getOwnedOrgIds(caller);
+    let myArticles = List.empty<Article>();
+    for (article in articles.values()) {
+      switch (article.organizationId) {
+        case (?orgId) {
+          // Check if caller owns this org
+          if (ownedOrgIds.find<Nat>(func(id) { id == orgId }) != null) {
+            myArticles.add(article);
+          };
+        };
+        case (null) {
+          // Non-org articles not visible to regular admins
+        };
+      };
+    };
+    myArticles.toArray().sort();
+  };
+
+  public query ({ caller }) func getOrgArticles(orgId : Nat) : async [Article] {
+    // Require super admin or org owner
+    validateSuperAdminOrOrgOwner(caller, orgId);
+
+    // Return all articles for this org (including drafts)
+    articles.values().filter(
+      func(article) { article.organizationId == ?orgId }
+    ).toArray().sort();
+  };
+
+  // === PUBLIC QUERIES (unchanged) ===
+
   public query func getPublishedArticles() : async [Article] {
     articles.values().filter(
       func(article) { article.isPublished }
@@ -251,34 +488,6 @@ actor {
         };
       };
     };
-  };
-
-  public query func getArticleById(articleId : Nat) : async Article {
-    switch (articles.get(articleId)) {
-      case (null) { Runtime.trap("Article not found") };
-      case (?article) { article };
-    };
-  };
-
-  public query func getArticlesByTag(tag : Text) : async [Article] {
-    articles.values().filter(
-      func(article) {
-        article.isPublished and article.tags.find(func(t) { t == tag }) != null
-      }
-    ).toArray().sort();
-  };
-
-  public query func getArticlesByOrg(orgId : Nat) : async [Article] {
-    articles.values().filter(
-      func(article) { article.isPublished and article.organizationId == ?orgId }
-    ).toArray().sort();
-  };
-
-  public query ({ caller }) func getAllArticles() : async [Article] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can view all articles");
-    };
-    articles.values().toArray().sort();
   };
 
   public query func searchArticles(queryText : Text) : async [Article] {
@@ -304,70 +513,6 @@ actor {
     authorArticles.toArray().sort();
   };
 
-  // Org Section Functions
-  public shared ({ caller }) func createOrg(
-    name : Text,
-    slug : Text,
-    description : Text,
-    logoBlobId : ?Text,
-    bannerBlobId : ?Text,
-  ) : async Nat {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can create orgs");
-    };
-
-    let org : OrgSection = {
-      id = orgIdCounter;
-      name;
-      slug;
-      description;
-      logoBlobId;
-      bannerBlobId;
-      createdAt = Time.now();
-    };
-
-    organizations.add(orgIdCounter, org);
-    orgIdCounter += 1;
-    org.id;
-  };
-
-  public shared ({ caller }) func updateOrg(
-    orgId : Nat,
-    name : Text,
-    slug : Text,
-    description : Text,
-    logoBlobId : ?Text,
-    bannerBlobId : ?Text,
-  ) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can update orgs");
-    };
-
-    switch (organizations.get(orgId)) {
-      case (null) { Runtime.trap("Organization not found") };
-      case (?existingOrg) {
-        let updatedOrg : OrgSection = {
-          id = existingOrg.id;
-          name;
-          slug;
-          description;
-          logoBlobId;
-          bannerBlobId;
-          createdAt = existingOrg.createdAt;
-        };
-
-        organizations.add(orgId, updatedOrg);
-      };
-    };
-  };
-
-  public shared ({ caller }) func deleteOrg(orgId : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can delete orgs");
-    };
-    organizations.remove(orgId);
-  };
-
   public query func getOrgs() : async [OrgSection] {
     organizations.values().toArray();
   };
@@ -379,7 +524,29 @@ actor {
     };
   };
 
-  // User Profile Functions
+  public query func getArticleById(articleId : Nat) : async Article {
+    switch (articles.get(articleId)) {
+      case (null) { Runtime.trap("Article not found") };
+      case (?article) { article };
+    };
+  };
+
+  public query func getArticlesByTag(tag : Text) : async [Article] {
+    articles.values().filter(
+      func(article) {
+        article.isPublished and article.tags.find(func(t) { t == tag }) != null
+      }
+    ).toArray().sort();
+  };
+
+  public query func getArticlesByOrg(orgId : Nat) : async [Article] {
+    articles.values().filter(
+      func(article) { article.isPublished and article.organizationId == ?orgId }
+    ).toArray().sort();
+  };
+
+  // === USER PROFILE MANAGEMENT ===
+
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -387,7 +554,6 @@ actor {
     userProfiles.get(caller);
   };
 
-  // Public read -- no auth check so author pages are visible to everyone
   public query func getUserProfile(user : Principal) : async ?UserProfile {
     userProfiles.get(user);
   };
@@ -396,7 +562,6 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
-    // Always save under the caller's own principal for security
     let safeProfile = { profile with principal = caller };
     userProfiles.add(caller, safeProfile);
   };

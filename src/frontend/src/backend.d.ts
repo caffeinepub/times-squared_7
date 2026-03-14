@@ -46,6 +46,7 @@ export enum UserRole {
 }
 export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    claimSuperAdmin(): Promise<void>;
     createArticle(title: string, author: string, authorPrincipal: Principal | null, organizationId: bigint | null, publicationDate: string, heroImageBlobId: string | null, heroImageBlobId2: string | null, bodyContent: string, tags: Array<string>): Promise<bigint>;
     createOrg(name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<bigint>;
     deleteArticle(articleId: bigint): Promise<void>;
@@ -59,9 +60,12 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getFeaturedArticle(): Promise<Article | null>;
+    getMyOrgs(): Promise<Array<OrgSection>>;
+    getOrgArticles(orgId: bigint): Promise<Array<Article>>;
     getOrgById(orgId: bigint): Promise<OrgSection>;
     getOrgs(): Promise<Array<OrgSection>>;
     getPublishedArticles(): Promise<Array<Article>>;
+    getSuperAdmin(): Promise<Principal | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     publishArticle(articleId: bigint): Promise<void>;

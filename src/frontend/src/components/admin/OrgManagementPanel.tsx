@@ -18,7 +18,7 @@ import type { OrgSection } from "../../backend.d";
 import {
   useCreateOrg,
   useDeleteOrg,
-  useGetOrgs,
+  useGetMyOrgs,
   useUpdateOrg,
 } from "../../hooks/useQueries";
 import { uploadFileToBlobStorage } from "../../hooks/useUploadFile";
@@ -47,7 +47,7 @@ function slugify(s: string) {
 }
 
 export default function OrgManagementPanel() {
-  const { data: orgs = [], isLoading } = useGetOrgs();
+  const { data: orgs = [], isLoading } = useGetMyOrgs();
   const { mutateAsync: createOrg, isPending: isCreating } = useCreateOrg();
   const { mutateAsync: updateOrg, isPending: isUpdating } = useUpdateOrg();
   const { mutateAsync: deleteOrg } = useDeleteOrg();
@@ -154,7 +154,7 @@ export default function OrgManagementPanel() {
   return (
     <div data-ocid="admin.orgs.panel" className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <span className="section-label">Organisations</span>
+        <span className="section-label">My Organisations</span>
         {!showForm && (
           <button
             type="button"

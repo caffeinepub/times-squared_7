@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useEffect, useState } from "react";
 import Header from "./components/Header";
 import { loadConfig } from "./config";
+import { useSuperAdminClaim } from "./hooks/useSuperAdminClaim";
 import ArticlePage from "./pages/ArticlePage";
 import AuthorPage from "./pages/AuthorPage";
 import HomePage from "./pages/HomePage";
@@ -28,6 +29,11 @@ function parseRoute(pathname: string) {
   if (sectionMatch) return { page: "section", param: sectionMatch[1] };
 
   return { page: "home" };
+}
+
+function SuperAdminClaimEffect() {
+  useSuperAdminClaim();
+  return null;
 }
 
 export default function App() {
@@ -74,6 +80,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
+      <SuperAdminClaimEffect />
       {showHeader && <Header />}
       <div className="flex-1">{renderPage()}</div>
 
