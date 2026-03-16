@@ -131,6 +131,7 @@ export function useGetOrgById(orgId: bigint | null) {
       return actor.getOrgById(orgId);
     },
     enabled: !!actor && !isFetching && orgId !== null,
+    retry: false,
   });
 }
 
@@ -375,6 +376,8 @@ export function useFeatureArticle() {
       for (const key of articleKeys) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
+      queryClient.invalidateQueries({ queryKey: ["articlesByTag"] });
+      queryClient.invalidateQueries({ queryKey: ["articlesByOrg"] });
     },
   });
 }
@@ -391,6 +394,8 @@ export function useUnfeatureArticle() {
       for (const key of articleKeys) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
+      queryClient.invalidateQueries({ queryKey: ["articlesByTag"] });
+      queryClient.invalidateQueries({ queryKey: ["articlesByOrg"] });
     },
   });
 }

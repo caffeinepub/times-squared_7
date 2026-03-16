@@ -124,7 +124,7 @@ export interface _SERVICE {
   'getMyMemberships' : ActorMethod<[], Array<OrgMembership>>,
   'getMyOrgs' : ActorMethod<[], Array<OrgSection>>,
   'getOrgArticles' : ActorMethod<[bigint], Array<Article>>,
-  'getOrgById' : ActorMethod<[bigint], OrgSection>,
+  'getOrgById' : ActorMethod<[bigint], [] | [OrgSection]>,
   'getOrgMembers' : ActorMethod<[bigint], Array<OrgMembership>>,
   'getOrgs' : ActorMethod<[], Array<OrgSection>>,
   'getPublishedArticles' : ActorMethod<[], Array<Article>>,

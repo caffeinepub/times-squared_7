@@ -27,7 +27,12 @@ function BlobImage({
 }
 
 export default function ArticlePage({ id }: ArticlePageProps) {
-  const articleId = BigInt(id);
+  let articleId: bigint | null = null;
+  try {
+    articleId = BigInt(id);
+  } catch {
+    // invalid id in URL
+  }
   const { data: article, isLoading } = useGetArticleById(articleId);
   const orgId = article?.organizationId ?? null;
   const { data: org } = useGetOrgById(orgId);

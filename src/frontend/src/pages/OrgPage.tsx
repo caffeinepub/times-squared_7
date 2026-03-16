@@ -21,14 +21,16 @@ export default function OrgPage({ slug }: OrgPageProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (org?.bannerBlobId) {
-      const blob = ExternalBlob.fromURL(org.bannerBlobId);
-      setBannerUrl(blob.getDirectURL());
-    }
-    if (org?.logoBlobId) {
-      const blob = ExternalBlob.fromURL(org.logoBlobId);
-      setLogoUrl(blob.getDirectURL());
-    }
+    setBannerUrl(
+      org?.bannerBlobId
+        ? ExternalBlob.fromURL(org.bannerBlobId).getDirectURL()
+        : null,
+    );
+    setLogoUrl(
+      org?.logoBlobId
+        ? ExternalBlob.fromURL(org.logoBlobId).getDirectURL()
+        : null,
+    );
   }, [org]);
 
   if (orgsLoading) {

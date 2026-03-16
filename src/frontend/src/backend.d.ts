@@ -98,7 +98,7 @@ export interface backendInterface {
     getMyOrgs(): Promise<Array<OrgSection>>;
     getMySubmissions(): Promise<Array<SubmissionWithArticle>>;
     getOrgArticles(orgId: bigint): Promise<Array<Article>>;
-    getOrgById(orgId: bigint): Promise<OrgSection>;
+    getOrgById(orgId: bigint): Promise<OrgSection | null>;
     getOrgMembers(orgId: bigint): Promise<Array<OrgMembership>>;
     getOrgs(): Promise<Array<OrgSection>>;
     getPendingSubmissions(orgId: bigint): Promise<Array<SubmissionWithArticle>>;

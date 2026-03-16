@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FilePlus, Pencil, Star, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import type { Article } from "../../backend.d";
+import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import {
   useDeleteArticle,
   useFeatureArticle,
@@ -30,6 +32,8 @@ export default function ArticleListPanel({
   onEdit,
   onNew,
 }: ArticleListPanelProps) {
+  const { identity } = useInternetIdentity();
+  const callerPrincipal = identity?.getPrincipal().toString();
   const { data: articles = [], isLoading } = useGetAllArticles();
   const { mutateAsync: deleteArticle, isPending: isDeleting } =
     useDeleteArticle();
@@ -45,7 +49,7 @@ export default function ArticleListPanel({
   });
 
   return (
-    <div data-ocid="admin.articles.panel" className="flex flex-col h-full">
+    <div data-ocid="admin.articles.panel" className="flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <span className="section-label">Articles</span>
         <button
@@ -77,7 +81,7 @@ export default function ArticleListPanel({
       )}
 
       {!isLoading && sorted.length > 0 && (
-        <div className="space-y-px overflow-y-auto flex-1 -mx-1 px-1">
+        <div className="space-y-px -mx-1 px-1">
           {sorted.map((article, i) => (
             <div
               key={article.id.toString()}
@@ -127,22 +131,33 @@ export default function ArticleListPanel({
                 </button>
 
                 {/* Publish/Unpublish */}
-                <button
-                  type="button"
-                  title={article.isPublished ? "Unpublish" : "Publish"}
-                  onClick={() =>
-                    article.isPublished
-                      ? unpublishArticle(article.id)
-                      : publishArticle(article.id)
-                  }
-                  className={`text-[9px] uppercase tracking-widest font-sans px-2 py-1 border transition-colors ${
-                    article.isPublished
-                      ? "border-white/20 text-white/40 hover:text-white/70"
-                      : "border-emerald-500/40 text-emerald-400/60 hover:text-emerald-400"
-                  }`}
-                >
-                  {article.isPublished ? "Unpub" : "Pub"}
-                </button>
+                {article.isPublished ? (
+                  article.authorPrincipal?.toString() === callerPrincipal && (
+                    <button
+                      type="button"
+                      title="Unpublish"
+                      onClick={() =>
+                        unpublishArticle(article.id).catch(() =>
+                          toast.error(
+                            "Only the original author can unpublish this article",
+                          ),
+                        )
+                      }
+                      className="text-[9px] uppercase tracking-widest font-sans px-2 py-1 border border-white/20 text-white/40 hover:text-white/70 transition-colors"
+                    >
+                      Unpub
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    title="Publish"
+                    onClick={() => publishArticle(article.id)}
+                    className="text-[9px] uppercase tracking-widest font-sans px-2 py-1 border border-emerald-500/40 text-emerald-400/60 hover:text-emerald-400 transition-colors"
+                  >
+                    Pub
+                  </button>
+                )}
 
                 {/* Edit */}
                 <button

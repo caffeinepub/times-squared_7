@@ -18,13 +18,8 @@ import SubmissionsPanel from "./admin/SubmissionsPanel";
 import UserRolePanel from "./admin/UserRolePanel";
 import MySubmissionsPanel from "./contributor/MySubmissionsPanel";
 
-type AdminPanel =
-  | "articles"
-  | "article-form"
-  | "orgs"
-  | "users"
-  | "submissions";
-type ContributorPanel = "my-drafts" | "contributor-form";
+type AdminPanel = "articles" | "orgs" | "users" | "submissions";
+type ContributorPanel = "my-drafts";
 type DrawerPanel = AdminPanel | ContributorPanel | null;
 
 interface NavDrawerProps {
@@ -47,11 +42,12 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
     !!callerPrincipal &&
     superAdmin.toString() === callerPrincipal;
 
-  // Contributor = authenticated, non-admin, has at least one org membership
   const isContributor = isAuthenticated && !isAdmin && myMemberships.length > 0;
 
   const [activePanel, setActivePanel] = useState<DrawerPanel>(null);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [formOverlayOpen, setFormOverlayOpen] = useState(false);
+  const [isContributorMode, setIsContributorMode] = useState(false);
 
   const handleNav = (path: string) => {
     onClose();
@@ -76,11 +72,23 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
     }
   };
 
-  const openEditArticle = (article: Article) => {
+  const openEditArticle = (article: Article, contributorMode = false) => {
     setEditingArticle(article);
-    setActivePanel(
-      activePanel === "my-drafts" ? "contributor-form" : "article-form",
-    );
+    setIsContributorMode(contributorMode);
+    setFormOverlayOpen(true);
+    onClose();
+  };
+
+  const openNewArticle = (contributorMode = false) => {
+    setEditingArticle(null);
+    setIsContributorMode(contributorMode);
+    setFormOverlayOpen(true);
+    onClose();
+  };
+
+  const closeFormOverlay = () => {
+    setFormOverlayOpen(false);
+    setEditingArticle(null);
   };
 
   const navLinks = [
@@ -91,98 +99,71 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
   const isAdminView = activePanel !== null;
   const drawerWidth = isAdminView ? "w-[480px] max-w-[95vw]" : "w-72";
 
-  const getBackTarget = (): DrawerPanel => {
-    if (activePanel === "article-form") return "articles";
-    if (activePanel === "contributor-form") return "my-drafts";
-    return null;
-  };
-
-  const panelVariants = {
-    initial: { x: "100%", opacity: 0 },
-    animate: { x: 0, opacity: 1 },
-    exit: { x: "100%", opacity: 0 },
-  };
-
-  const subPanelVariants = {
-    initial: { x: 40, opacity: 0 },
-    animate: { x: 0, opacity: 1 },
-    exit: { x: 40, opacity: 0 },
-  };
-
-  // Determine which orgs to pass to the article form
-  // Contributors get the orgs they're a member of; admins get their own orgs
   const contributorOrgIds = myMemberships.map((m) => m.orgId);
 
+  const overlayVariants = {
+    initial: { x: "100%" },
+    animate: { x: 0 },
+    exit: { x: "100%" },
+  };
+
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/70 z-40"
-            onClick={handleClose}
-          />
-          <motion.nav
-            data-ocid="nav.drawer"
-            variants={panelVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ type: "tween", duration: 0.3, ease: "easeInOut" }}
-            className={`fixed top-0 right-0 h-full ${drawerWidth} bg-black border-l border-white/20 z-50 flex flex-col transition-[width] duration-300`}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-white/20 shrink-0">
-              {activePanel !== null ? (
+    <>
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/70 z-40"
+              onClick={handleClose}
+            />
+            <motion.nav
+              data-ocid="nav.drawer"
+              variants={{
+                initial: { x: "100%", opacity: 0 },
+                animate: { x: 0, opacity: 1 },
+                exit: { x: "100%", opacity: 0 },
+              }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ type: "tween", duration: 0.3, ease: "easeInOut" }}
+              className={`fixed top-0 right-0 h-[100dvh] ${drawerWidth} bg-black border-l border-white/20 z-50 flex flex-col`}
+            >
+              <div className="flex items-center justify-between p-6 border-b border-white/20 shrink-0">
+                {activePanel !== null ? (
+                  <button
+                    type="button"
+                    data-ocid="nav.admin.back.button"
+                    onClick={() => setActivePanel(null)}
+                    className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-xs font-sans uppercase tracking-wider"
+                  >
+                    <ArrowLeft size={14} />
+                    Back
+                  </button>
+                ) : (
+                  <span className="section-label">Navigation</span>
+                )}
                 <button
                   type="button"
-                  data-ocid="nav.admin.back.button"
-                  onClick={() => {
-                    const back = getBackTarget();
-                    setActivePanel(back);
-                    if (
-                      back === null ||
-                      back === "articles" ||
-                      back === "my-drafts"
-                    ) {
-                      setEditingArticle(null);
-                    }
-                  }}
-                  className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-xs font-sans uppercase tracking-wider"
+                  data-ocid="nav.drawer.close_button"
+                  onClick={handleClose}
+                  className="text-white/50 hover:text-white transition-colors"
+                  aria-label="Close navigation"
                 >
-                  <ArrowLeft size={14} />
-                  Back
+                  <X size={20} />
                 </button>
-              ) : (
-                <span className="section-label">Navigation</span>
-              )}
-              <button
-                type="button"
-                data-ocid="nav.drawer.close_button"
-                onClick={handleClose}
-                className="text-white/50 hover:text-white transition-colors"
-                aria-label="Close navigation"
-              >
-                <X size={20} />
-              </button>
-            </div>
+              </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto">
-              <AnimatePresence mode="wait">
+              <div
+                key={activePanel ?? "root"}
+                className="flex-1 min-h-0 overflow-y-auto"
+              >
                 {activePanel === null && (
-                  <motion.div
-                    key="nav-main"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="flex flex-col p-6 gap-1"
-                  >
+                  <div className="flex flex-col p-6 gap-1">
                     {navLinks.map((link) => (
                       <button
                         type="button"
@@ -224,7 +205,6 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                       </button>
                     )}
 
-                    {/* Contributor section */}
                     {isContributor && (
                       <div className="mt-6 pt-4 border-t border-white/10">
                         <p className="section-label mb-3">Contribute</p>
@@ -292,145 +272,102 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
                         </div>
                       </div>
                     )}
-                  </motion.div>
+                  </div>
                 )}
 
                 {activePanel === "articles" && (
-                  <motion.div
-                    key="admin-articles"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="p-6"
-                  >
+                  <div className="p-6">
                     <ArticleListPanel
-                      onEdit={openEditArticle}
-                      onNew={() => {
-                        setEditingArticle(null);
-                        setActivePanel("article-form");
-                      }}
+                      onEdit={(article) => openEditArticle(article, false)}
+                      onNew={() => openNewArticle(false)}
                     />
-                  </motion.div>
-                )}
-
-                {activePanel === "article-form" && (
-                  <motion.div
-                    key="admin-article-form"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="p-6"
-                  >
-                    <ArticleFormPanel
-                      article={editingArticle}
-                      onBack={() => {
-                        setActivePanel("articles");
-                        setEditingArticle(null);
-                      }}
-                      orgs={myOrgs}
-                    />
-                  </motion.div>
+                  </div>
                 )}
 
                 {activePanel === "submissions" && (
-                  <motion.div
-                    key="admin-submissions"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="p-6"
-                  >
+                  <div className="p-6">
                     <SubmissionsPanel orgs={myOrgs} />
-                  </motion.div>
+                  </div>
                 )}
 
                 {activePanel === "orgs" && (
-                  <motion.div
-                    key="admin-orgs"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="p-6"
-                  >
+                  <div className="p-6">
                     <OrgManagementPanel />
-                  </motion.div>
+                  </div>
                 )}
 
                 {activePanel === "users" && (
-                  <motion.div
-                    key="admin-users"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="p-6"
-                  >
+                  <div className="p-6">
                     <UserRolePanel />
-                  </motion.div>
+                  </div>
                 )}
 
                 {activePanel === "my-drafts" && (
-                  <motion.div
-                    key="contributor-drafts"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="p-6"
-                  >
+                  <div className="p-6">
                     <MySubmissionsPanel
-                      onEdit={openEditArticle}
-                      onNew={() => {
-                        setEditingArticle(null);
-                        setActivePanel("contributor-form");
-                      }}
+                      onEdit={(article) => openEditArticle(article, true)}
+                      onNew={() => openNewArticle(true)}
                     />
-                  </motion.div>
+                  </div>
                 )}
+              </div>
 
-                {activePanel === "contributor-form" && (
-                  <motion.div
-                    key="contributor-form"
-                    variants={subPanelVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ duration: 0.2 }}
-                    className="p-6"
-                  >
-                    <ArticleFormPanel
-                      article={editingArticle}
-                      onBack={() => {
-                        setActivePanel("my-drafts");
-                        setEditingArticle(null);
-                      }}
-                      orgs={myOrgs}
-                      contributorOrgIds={contributorOrgIds}
-                      isContributorMode
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+              <div className="p-6 border-t border-white/10 shrink-0">
+                <p className="text-white/20 text-[10px] font-sans uppercase tracking-widest">
+                  Times Squared · On-Chain
+                </p>
+              </div>
+            </motion.nav>
+          </>
+        )}
+      </AnimatePresence>
 
-            <div className="p-6 border-t border-white/10 shrink-0">
-              <p className="text-white/20 text-[10px] font-sans uppercase tracking-widest">
-                Times Squared · On-Chain
-              </p>
+      {/* Article Form Overlay — rendered outside drawer DOM, fixed full-screen */}
+      <AnimatePresence>
+        {formOverlayOpen && (
+          <motion.div
+            variants={overlayVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ type: "tween", duration: 0.3, ease: "easeInOut" }}
+            className="fixed inset-0 z-[60] bg-black overflow-y-auto"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-black border-b border-white/20">
+              <button
+                type="button"
+                data-ocid="article-form.back.button"
+                onClick={closeFormOverlay}
+                className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-xs font-sans uppercase tracking-wider"
+              >
+                <ArrowLeft size={14} />
+                Back
+              </button>
+              <button
+                type="button"
+                data-ocid="article-form.close_button"
+                onClick={closeFormOverlay}
+                className="text-white/50 hover:text-white transition-colors"
+                aria-label="Close article form"
+              >
+                <X size={20} />
+              </button>
             </div>
-          </motion.nav>
-        </>
-      )}
-    </AnimatePresence>
+            <div className="p-6 max-w-2xl mx-auto">
+              <ArticleFormPanel
+                key={editingArticle?.id?.toString() ?? "new"}
+                article={editingArticle}
+                onBack={closeFormOverlay}
+                orgs={myOrgs}
+                contributorOrgIds={
+                  isContributorMode ? contributorOrgIds : undefined
+                }
+                isContributorMode={isContributorMode}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

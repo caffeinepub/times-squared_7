@@ -20,8 +20,8 @@ export function useSuperAdminClaim() {
       try {
         const superAdmin = await actor.getSuperAdmin();
         if (superAdmin == null) {
-          hasClaimed.current = true;
           await actor.claimSuperAdmin();
+          hasClaimed.current = true;
           queryClient.invalidateQueries({ queryKey: ["superAdmin"] });
           queryClient.invalidateQueries({ queryKey: ["isAdmin"] });
         }

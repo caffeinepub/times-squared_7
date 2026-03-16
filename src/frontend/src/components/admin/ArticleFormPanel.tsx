@@ -63,7 +63,7 @@ export default function ArticleFormPanel({
   const [heroId, setHeroId] = useState<string | null>(
     article?.heroImageBlobId ?? null,
   );
-  const [heroId2] = useState<string | null>(article?.heroImageBlobId2 ?? null);
+  const heroId2 = article?.heroImageBlobId2 ?? null;
   const [isPublished, setIsPublished] = useState(article?.isPublished ?? false);
   const [uploadingHero, setUploadingHero] = useState(false);
 

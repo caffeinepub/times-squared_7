@@ -25,24 +25,33 @@ interface MySubmissionsPanelProps {
   onNew: () => void;
 }
 
-function StatusBadge({ status }: { status: SubmissionStatus }) {
-  if (status === SubmissionStatus.draft) {
+// "Published" state is derived from article.isPublished rather than a
+// separate submission status, avoiding stable variable migration issues.
+function StatusBadge({ item }: { item: SubmissionWithArticle }) {
+  if (item.article.isPublished) {
     return (
-      <span className="text-[9px] uppercase tracking-widest font-sans text-white/30">
-        Draft
+      <span className="text-[9px] uppercase tracking-widest font-sans text-emerald-400/80">
+        Published
       </span>
     );
   }
-  if (status === SubmissionStatus.pending_review) {
+  if (item.submission.submissionStatus === SubmissionStatus.pending_review) {
     return (
       <span className="text-[9px] uppercase tracking-widest font-sans text-amber-400/70">
         Pending Review
       </span>
     );
   }
+  if (item.submission.submissionStatus === SubmissionStatus.rejected) {
+    return (
+      <span className="text-[9px] uppercase tracking-widest font-sans text-red-400/70">
+        Rejected
+      </span>
+    );
+  }
   return (
-    <span className="text-[9px] uppercase tracking-widest font-sans text-red-400/70">
-      Rejected
+    <span className="text-[9px] uppercase tracking-widest font-sans text-white/30">
+      Draft
     </span>
   );
 }
@@ -124,76 +133,81 @@ export default function MySubmissionsPanel({
                     {item.article.title || "Untitled"}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <StatusBadge status={item.submission.submissionStatus} />
+                    <StatusBadge item={item} />
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {/* Edit */}
-                  <button
-                    type="button"
-                    data-ocid={`contributor.submission.edit_button.${i + 1}`}
-                    title="Edit"
-                    onClick={() => onEdit(item.article)}
-                    className="p-1.5 text-white/30 hover:text-white/80 transition-colors"
-                  >
-                    <Pencil size={12} />
-                  </button>
-
-                  {/* Submit for review (only for draft or rejected -> draft after edit) */}
-                  {item.submission.submissionStatus ===
-                    SubmissionStatus.draft && (
+                  {/* Edit (not shown for published articles) */}
+                  {!item.article.isPublished && (
                     <button
                       type="button"
-                      data-ocid={`contributor.submission.submit_button.${i + 1}`}
-                      title="Submit for review"
-                      disabled={isSubmitting}
-                      onClick={() => handleSubmit(item)}
-                      className="flex items-center gap-1 text-[9px] uppercase tracking-widest font-sans px-2 py-1 border border-emerald-500/40 text-emerald-400/60 hover:text-emerald-400 transition-colors disabled:opacity-40"
+                      data-ocid={`contributor.submission.edit_button.${i + 1}`}
+                      title="Edit"
+                      onClick={() => onEdit(item.article)}
+                      className="p-1.5 text-white/30 hover:text-white/80 transition-colors"
                     >
-                      <Send size={9} />
-                      Submit
+                      <Pencil size={12} />
                     </button>
                   )}
 
-                  {/* Delete */}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                  {/* Submit for review (only for draft status, not published) */}
+                  {!item.article.isPublished &&
+                    item.submission.submissionStatus ===
+                      SubmissionStatus.draft && (
                       <button
                         type="button"
-                        data-ocid={`contributor.submission.delete_button.${i + 1}`}
-                        title="Delete"
-                        className="p-1.5 text-white/20 hover:text-red-400 transition-colors"
+                        data-ocid={`contributor.submission.submit_button.${i + 1}`}
+                        title="Submit for review"
+                        disabled={isSubmitting}
+                        onClick={() => handleSubmit(item)}
+                        className="flex items-center gap-1 text-[9px] uppercase tracking-widest font-sans px-2 py-1 border border-emerald-500/40 text-emerald-400/60 hover:text-emerald-400 transition-colors disabled:opacity-40"
                       >
-                        <Trash2 size={12} />
+                        <Send size={9} />
+                        Submit
                       </button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-black border border-white/20 text-white">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="font-editorial text-white">
-                          Delete Draft?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="text-white/50 font-sans">
-                          "{item.article.title}" will be permanently deleted.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel
-                          data-ocid="contributor.submission.delete.cancel_button"
-                          className="bg-transparent border-white/20 text-white/60 hover:bg-white/5 hover:text-white"
+                    )}
+
+                  {/* Delete (not shown for published articles) */}
+                  {!item.article.isPublished && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          type="button"
+                          data-ocid={`contributor.submission.delete_button.${i + 1}`}
+                          title="Delete"
+                          className="p-1.5 text-white/20 hover:text-red-400 transition-colors"
                         >
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          data-ocid="contributor.submission.delete.confirm_button"
-                          onClick={() => deleteArticle(item.article.id)}
-                          disabled={isDeleting}
-                          className="bg-red-500/80 hover:bg-red-500 text-white border-0"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          <Trash2 size={12} />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-black border border-white/20 text-white">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="font-editorial text-white">
+                            Delete Draft?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-white/50 font-sans">
+                            "{item.article.title}" will be permanently deleted.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel
+                            data-ocid="contributor.submission.delete.cancel_button"
+                            className="bg-transparent border-white/20 text-white/60 hover:bg-white/5 hover:text-white"
+                          >
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            data-ocid="contributor.submission.delete.confirm_button"
+                            onClick={() => deleteArticle(item.article.id)}
+                            disabled={isDeleting}
+                            className="bg-red-500/80 hover:bg-red-500 text-white border-0"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </div>
 

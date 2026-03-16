@@ -2,7 +2,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Edit2, Loader2, Save, X } from "lucide-react";
-import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ExternalBlob } from "../backend";
@@ -45,13 +44,21 @@ export default function AuthorPage({ principal }: AuthorPageProps) {
   const resolvedAvatarUrl = (() => {
     if (avatarUrl) return avatarUrl;
     if (profile?.avatarBlobId) {
-      return ExternalBlob.fromURL(profile.avatarBlobId).getDirectURL();
+      try {
+        return ExternalBlob.fromURL(profile.avatarBlobId).getDirectURL();
+      } catch {
+        return null;
+      }
     }
     return null;
   })();
 
-  const orgAffiliation = profile?.orgId
-    ? orgs.find((o) => o.id === profile.orgId)
+  const profileOrgId =
+    profile?.orgId != null && typeof profile.orgId === "bigint"
+      ? profile.orgId
+      : null;
+  const orgAffiliation = profileOrgId
+    ? (orgs.find((o) => o.id === profileOrgId) ?? null)
     : null;
 
   const initials = (profile?.name ?? principal.slice(0, 2))
@@ -130,13 +137,7 @@ export default function AuthorPage({ principal }: AuthorPageProps) {
   }
 
   return (
-    <motion.main
-      data-ocid="author.page"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="min-h-screen bg-black"
-    >
+    <main data-ocid="author.page" className="min-h-screen bg-black">
       <div className="max-w-3xl mx-auto px-6">
         <div className="pt-8 pb-6">
           <button
@@ -335,6 +336,6 @@ export default function AuthorPage({ principal }: AuthorPageProps) {
           </>
         )}
       </div>
-    </motion.main>
+    </main>
   );
 }

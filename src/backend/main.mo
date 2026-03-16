@@ -76,7 +76,8 @@ actor {
     joinedAt : Int;
   };
 
-  // B2: Submission workflow types
+  // SubmissionStatus is kept stable (no new variants to avoid migration issues).
+  // "Published" state is derived from article.isPublished on the frontend.
   type SubmissionStatus = {
     #draft;
     #pending_review;
@@ -113,8 +114,6 @@ actor {
   let organizations = Map.empty<Nat, OrgSection>();
   let orgInvites = Map.empty<Nat, OrgInvite>();
   let orgMemberships = Map.empty<Text, OrgMembership>();
-
-  // B2: Separate map for submission state (upgrade-safe -- does not modify Article type)
   let articleSubmissions = Map.empty<Nat, ArticleSubmission>();
 
   // === HELPER FUNCTIONS ===
@@ -155,7 +154,6 @@ actor {
     ownedOrgs.toArray();
   };
 
-  // Check if a principal is a member of an org
   func isOrgMemberLocal(caller : Principal, orgId : Nat) : Bool {
     let key = orgId.toText() # "_" # caller.toText();
     orgMemberships.get(key) != null;
@@ -187,19 +185,15 @@ actor {
       case (?_) {};
     };
 
-    switch (userProfiles.get(userPrincipal)) {
-      case (null) { Runtime.trap("User does not exist") };
-      case (?_) {};
-    };
+    // Bug fix: removed user profile existence check so admins can invite
+    // any valid principal, even before the user has logged in.
 
-    // Check if already member
     let membershipKey = orgId.toText() # "_" # userPrincipal.toText();
     switch (orgMemberships.get(membershipKey)) {
       case (null) {};
       case (?_) { Runtime.trap("User is already a member of this organization") };
     };
 
-    // Check if pending invite exists
     for ((_, invite) in orgInvites.entries()) {
       if (invite.orgId == orgId and invite.invitedPrincipal == userPrincipal and invite.status == #pending) {
         Runtime.trap("User already has a pending invite for this organization. Please check your invites.");
@@ -344,7 +338,6 @@ actor {
           bannerBlobId;
           createdAt = existingOrg.createdAt;
         };
-
         organizations.add(orgId, updatedOrg);
       };
     };
@@ -362,11 +355,9 @@ actor {
     };
 
     if (isSuperAdmin(caller)) {
-      // Super admin sees all orgs
       return organizations.values().toArray();
     };
 
-    // Regular admin sees only owned orgs
     let ownedOrgIds = getOwnedOrgIds(caller);
     let myOrgs = List.empty<OrgSection>();
     for (orgId in ownedOrgIds.values()) {
@@ -431,12 +422,10 @@ actor {
 
     articles.add(articleIdCounter, article);
 
-    // B2: If caller is an org member (not admin/owner), create a submission entry
     switch (organizationId) {
       case (?orgId) {
         let isAdminOrOwner = isSuperAdmin(caller) or isOrgOwner(caller, orgId);
         if (not isAdminOrOwner) {
-          // Contributor draft
           let submission : ArticleSubmission = {
             articleId = articleIdCounter;
             submissionStatus = #draft;
@@ -467,7 +456,6 @@ actor {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
-        // Allow original author to edit their own article
         let isAuthor = switch (existingArticle.authorPrincipal) {
           case (?ap) { ap == caller };
           case (null) { false };
@@ -511,10 +499,13 @@ actor {
 
         articles.add(articleId, updatedArticle);
 
-        // B2: If article had a rejected submission, reset it to draft after edit
         switch (articleSubmissions.get(articleId)) {
           case (?sub) {
-            if (sub.submissionStatus == #rejected) {
+            // Bug fix: if org changed, remove the orphaned submission
+            if (existingArticle.organizationId != organizationId) {
+              articleSubmissions.remove(articleId);
+            } else if (sub.submissionStatus == #rejected) {
+              // Reset rejected submission to draft after author edits
               let resetSub = { sub with submissionStatus = #draft; rejectionNote = null };
               articleSubmissions.add(articleId, resetSub);
             };
@@ -539,7 +530,6 @@ actor {
             };
           };
         };
-
         let updatedArticle = { existingArticle with isPublished = true };
         articles.add(articleId, updatedArticle);
       };
@@ -550,7 +540,6 @@ actor {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
-        // B2: Only original author or super admin can unpublish
         let isAuthor = switch (existingArticle.authorPrincipal) {
           case (?ap) { ap == caller };
           case (null) { false };
@@ -570,7 +559,6 @@ actor {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?existingArticle) {
-        // Allow original author to delete their own draft
         let isAuthor = switch (existingArticle.authorPrincipal) {
           case (?ap) { ap == caller };
           case (null) { false };
@@ -610,7 +598,6 @@ actor {
           };
         };
 
-        // Unfeature all other articles first
         for ((id, article) in articles.entries()) {
           if (article.isFeatured) {
             articles.add(id, { article with isFeatured = false });
@@ -646,12 +633,10 @@ actor {
 
   // === B2: SUBMISSION WORKFLOW ===
 
-  // Contributor submits their draft for review
   public shared ({ caller }) func submitArticleForReview(articleId : Nat) : async () {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
       case (?article) {
-        // Only original author can submit
         switch (article.authorPrincipal) {
           case (?ap) {
             if (ap != caller) {
@@ -677,7 +662,9 @@ actor {
     };
   };
 
-  // Org admin approves a submission -- publishes the article
+  // Bug fix: validate pending_review status before approving;
+  // keep the submission entry so contributors can see their approved work
+  // (frontend derives "published" state from article.isPublished)
   public shared ({ caller }) func approveArticleSubmission(articleId : Nat) : async () {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
@@ -693,18 +680,20 @@ actor {
 
         switch (articleSubmissions.get(articleId)) {
           case (null) { Runtime.trap("Article is not a contributor submission") };
-          case (?_) {
-            // Publish the article and remove submission entry (it is now live)
+          case (?sub) {
+            if (sub.submissionStatus != #pending_review) {
+              Runtime.trap("Cannot approve: article must be in pending review status");
+            };
+            // Publish the article; keep submission entry so contributor sees it
             let published = { article with isPublished = true };
             articles.add(articleId, published);
-            articleSubmissions.remove(articleId);
+            // Submission entry stays — frontend uses article.isPublished to show "Published" badge
           };
         };
       };
     };
   };
 
-  // Org admin rejects a submission with an optional note
   public shared ({ caller }) func rejectArticleSubmission(articleId : Nat, note : ?Text) : async () {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
@@ -729,7 +718,6 @@ actor {
     };
   };
 
-  // Contributor sees all their own submitted articles with submission status
   public query ({ caller }) func getMySubmissions() : async [SubmissionWithArticle] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can get submissions");
@@ -753,7 +741,7 @@ actor {
     result.toArray();
   };
 
-  // Org admin sees pending submissions for their org
+  // Bug fix: exclude already-published articles from the pending queue
   public query ({ caller }) func getPendingSubmissions(orgId : Nat) : async [SubmissionWithArticle] {
     validateSuperAdminOrOrgOwner(caller, orgId);
 
@@ -762,7 +750,8 @@ actor {
       if (sub.submissionStatus == #pending_review) {
         switch (articles.get(articleId)) {
           case (?article) {
-            if (article.organizationId == ?orgId) {
+            // Only show articles that are still unpublished (not yet approved)
+            if (article.organizationId == ?orgId and not article.isPublished) {
               result.add({ article; submission = sub });
             };
           };
@@ -781,11 +770,10 @@ actor {
     };
 
     if (isSuperAdmin(caller)) {
-      // Super admin sees all articles
       return articles.values().toArray().sort();
     };
 
-    // Regular admin sees only articles in orgs they own
+    // Bug fix: regular admins see their org articles AND their own no-org articles
     let ownedOrgIds = getOwnedOrgIds(caller);
     let myArticles = List.empty<Article>();
     for (article in articles.values()) {
@@ -796,7 +784,12 @@ actor {
           };
         };
         case (null) {
-          // Non-org articles not visible to regular admins
+          switch (article.authorPrincipal) {
+            case (?ap) {
+              if (ap == caller) { myArticles.add(article) };
+            };
+            case (null) {};
+          };
         };
       };
     };
@@ -804,10 +797,7 @@ actor {
   };
 
   public query ({ caller }) func getOrgArticles(orgId : Nat) : async [Article] {
-    // Require super admin or org owner
     validateSuperAdminOrOrgOwner(caller, orgId);
-
-    // Return all articles for this org (including drafts)
     articles.values().filter(
       func(article) { article.organizationId == ?orgId }
     ).toArray().sort();
@@ -865,11 +855,9 @@ actor {
     organizations.values().toArray();
   };
 
-  public query func getOrgById(orgId : Nat) : async OrgSection {
-    switch (organizations.get(orgId)) {
-      case (null) { Runtime.trap("Organization not found") };
-      case (?org) { org };
-    };
+  // Bug fix: return ?OrgSection so the frontend can handle missing orgs gracefully
+  public query func getOrgById(orgId : Nat) : async ?OrgSection {
+    organizations.get(orgId);
   };
 
   public query func getArticleById(articleId : Nat) : async Article {
