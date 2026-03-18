@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import type { Article, OrgSection } from "../backend.d";
+import { getExcerpt } from "../lib/excerpt";
 import { formatDate, navigate } from "../lib/navigate";
 
 interface ArticleCardProps {
@@ -83,7 +84,7 @@ export default function ArticleCard({
           )}
         </div>
         <p className="text-white/60 text-sm leading-relaxed line-clamp-2 font-sans">
-          {article.excerpt}
+          {getExcerpt(article)}
         </p>
         <div className="flex items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2">

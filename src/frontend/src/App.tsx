@@ -77,7 +77,6 @@ export default function App() {
   };
 
   const year = new Date().getFullYear();
-  const hostname = encodeURIComponent(window.location.hostname);
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
@@ -93,17 +92,7 @@ export default function App() {
       {showHeader && (
         <footer className="border-t border-white/10 py-8 mt-16">
           <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-white/30 text-xs font-sans">
-              © {year}.{" "}
-              <a
-                href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${hostname}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-white/60 transition-colors"
-              >
-                Built with love using caffeine.ai
-              </a>
-            </p>
+            <p className="text-white/30 text-xs font-sans">© {year}.</p>
             {canisterId && (
               <code
                 className="font-mono text-white/20"

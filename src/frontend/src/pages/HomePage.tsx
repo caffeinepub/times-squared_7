@@ -9,6 +9,7 @@ import {
   useGetOrgs,
   useGetPublishedArticles,
 } from "../hooks/useQueries";
+import { getExcerpt } from "../lib/excerpt";
 import { formatDate, navigate } from "../lib/navigate";
 
 function HeroImage({ blobId }: { blobId: string }) {
@@ -120,7 +121,7 @@ export default function HomePage() {
               <span>{formatDate(featuredArticle.publicationDate)}</span>
             </div>
             <p className="text-white/60 font-sans leading-relaxed mb-6 line-clamp-3 max-w-2xl">
-              {featuredArticle.excerpt}
+              {getExcerpt(featuredArticle)}
             </p>
             <div className="flex items-center gap-4">
               <button

@@ -133,12 +133,6 @@ actor {
     };
   };
 
-  func validateOrgOwner(caller : Principal, orgId : Nat) {
-    if (not isOrgOwner(caller, orgId)) {
-      Runtime.trap("Unauthorized: Only the organization owner can perform this action");
-    };
-  };
-
   func validateSuperAdminOrOrgOwner(caller : Principal, orgId : Nat) {
     if (not isSuperAdmin(caller) and not isOrgOwner(caller, orgId)) {
       Runtime.trap("Unauthorized: Only super admin or organization owner can perform this action");
@@ -158,6 +152,37 @@ actor {
   func isOrgMemberLocal(caller : Principal, orgId : Nat) : Bool {
     let key = orgId.toText() # "_" # caller.toText();
     orgMemberships.get(key) != null;
+  };
+
+  // Strip HTML tags from a string and return plain text truncated to maxLen chars.
+  // Used to generate clean excerpts from rich-text HTML body content.
+  func extractPlainTextExcerpt(html : Text, maxLen : Nat) : Text {
+    var plain = "";
+    var inTag = false;
+    for (c in html.chars()) {
+      if (c == '<') {
+        inTag := true;
+      } else if (c == '>') {
+        inTag := false;
+      } else if (not inTag) {
+        plain #= Text.fromChar(c);
+      };
+    };
+    // Trim leading/trailing whitespace chars
+    let trimmed = plain.trimStart(#predicate(func(c) { c == ' ' or c == '\n' or c == '\t' })).trimEnd(#predicate(func(c) { c == ' ' or c == '\n' or c == '\t' }));
+    if (trimmed.size() > maxLen) {
+      var i = 0;
+      var truncated = "";
+      for (c in trimmed.chars()) {
+        if (i < maxLen) {
+          truncated #= Text.fromChar(c);
+          i += 1;
+        };
+      };
+      truncated;
+    } else {
+      trimmed;
+    };
   };
 
   // === SUPER ADMIN FUNCTIONS ===
@@ -400,11 +425,7 @@ actor {
       };
     };
 
-    let excerpt = if (bodyContent.size() > 200) {
-      bodyContent.toArray().sliceToArray(0, 200).toText();
-    } else {
-      bodyContent;
-    };
+    let excerpt = extractPlainTextExcerpt(bodyContent, 200);
 
     let article : Article = {
       id = articleIdCounter;
@@ -477,11 +498,7 @@ actor {
           };
         };
 
-        let excerpt = if (bodyContent.size() > 200) {
-          bodyContent.toArray().sliceToArray(0, 200).toText();
-        } else {
-          bodyContent;
-        };
+        let excerpt = extractPlainTextExcerpt(bodyContent, 200);
 
         let updatedArticle : Article = {
           id = existingArticle.id;
