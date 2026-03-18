@@ -101,20 +101,21 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  var articleIdCounter = 0;
-  var orgIdCounter = 0;
-  var inviteIdCounter = 0;
+  stable var articleIdCounter = 0;
+  stable var orgIdCounter = 0;
+  stable var inviteIdCounter = 0;
 
-  var superAdmin : ?Principal = null;
-  let orgOwners = Map.empty<Nat, Principal>();
+  // stable var ensures superAdmin principal survives canister upgrades
+  stable var superAdmin : ?Principal = null;
+  stable var orgOwners = Map.empty<Nat, Principal>();
 
   // Storage
-  let articles = Map.empty<Nat, Article>();
-  let userProfiles = Map.empty<Principal, UserProfile>();
-  let organizations = Map.empty<Nat, OrgSection>();
-  let orgInvites = Map.empty<Nat, OrgInvite>();
-  let orgMemberships = Map.empty<Text, OrgMembership>();
-  let articleSubmissions = Map.empty<Nat, ArticleSubmission>();
+  stable var articles = Map.empty<Nat, Article>();
+  stable var userProfiles = Map.empty<Principal, UserProfile>();
+  stable var organizations = Map.empty<Nat, OrgSection>();
+  stable var orgInvites = Map.empty<Nat, OrgInvite>();
+  stable var orgMemberships = Map.empty<Text, OrgMembership>();
+  stable var articleSubmissions = Map.empty<Nat, ArticleSubmission>();
 
   // === HELPER FUNCTIONS ===
 
@@ -165,7 +166,9 @@ actor {
     switch (superAdmin) {
       case (null) {
         superAdmin := ?caller;
-        AccessControl.initialize(accessControlState, caller, "hardcoded-token", "");
+        // Directly assign #admin role; bypassing token comparison that would incorrectly register as #user
+        accessControlState.userRoles.add(caller, #admin);
+        accessControlState.adminAssigned := true;
       };
       case (_) { Runtime.trap("Super admin already claimed") };
     };

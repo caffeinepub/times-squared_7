@@ -9,34 +9,73 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { Principal } from "@icp-sdk/core/principal";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
-import type { Article, OrgSection } from "../../backend.d";
+import type { Article } from "../../backend.d";
 import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import {
   useCreateArticle,
+  useGetMyMemberships,
+  useGetMyOrgs,
   usePublishArticle,
   useUnpublishArticle,
   useUpdateArticle,
 } from "../../hooks/useQueries";
 import { uploadFileToBlobStorage } from "../../hooks/useUploadFile";
 
+// Sentinel value used in place of empty string for Radix Select.
+// Radix UI requires all SelectItem values to be non-empty strings.
+const NO_ORG = "__none__";
+
+// Error boundary so any crash shows a visible message instead of a blank screen.
+class FormErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: string | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(err: unknown) {
+    return {
+      error:
+        err instanceof Error ? err.message : "An unexpected error occurred",
+    };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-6 text-center">
+          <p className="text-red-400 font-sans text-sm mb-2">
+            Failed to load form
+          </p>
+          <p className="text-white/30 font-sans text-xs">{this.state.error}</p>
+          <button
+            type="button"
+            onClick={() => this.setState({ error: null })}
+            className="mt-4 text-white/50 hover:text-white text-xs font-sans uppercase tracking-wider"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 interface ArticleFormPanelProps {
   article?: Article | null;
   onBack: () => void;
-  orgs: OrgSection[];
   /** In contributor mode, only show orgs the contributor is a member of and hide publish toggle */
   isContributorMode?: boolean;
-  /** Org IDs the contributor belongs to (used for filtering orgs list) */
-  contributorOrgIds?: bigint[];
 }
 
-export default function ArticleFormPanel({
+function ArticleFormInner({
   article,
   onBack,
-  orgs,
   isContributorMode = false,
-  contributorOrgIds = [],
 }: ArticleFormPanelProps) {
   const { identity } = useInternetIdentity();
   const { mutateAsync: createArticle, isPending: isCreating } =
@@ -46,13 +85,18 @@ export default function ArticleFormPanel({
   const { mutateAsync: publishArticle } = usePublishArticle();
   const { mutateAsync: unpublishArticle } = useUnpublishArticle();
 
+  const { data: allOrgs = [] } = useGetMyOrgs();
+  const { data: myMemberships = [] } = useGetMyMemberships();
+  const contributorOrgIds = myMemberships.map((m) => m.orgId);
+
   const [title, setTitle] = useState(article?.title ?? "");
   const [author, setAuthor] = useState(article?.author ?? "");
   const [authorPrincipal, setAuthorPrincipal] = useState(
     article?.authorPrincipal?.toString() ?? "",
   );
+  // Use NO_ORG sentinel instead of empty string to satisfy Radix Select constraint.
   const [orgId, setOrgId] = useState<string>(
-    article?.organizationId?.toString() ?? "",
+    article?.organizationId?.toString() ?? NO_ORG,
   );
   const [pubDate, setPubDate] = useState(
     article?.publicationDate
@@ -69,10 +113,9 @@ export default function ArticleFormPanel({
 
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // In contributor mode, filter orgs to only those the contributor belongs to
   const availableOrgs = isContributorMode
-    ? orgs.filter((org) => contributorOrgIds.some((id) => id === org.id))
-    : orgs;
+    ? allOrgs.filter((org) => contributorOrgIds.some((id) => id === org.id))
+    : allOrgs;
 
   useEffect(() => {
     if (editorRef.current && article?.bodyContent) {
@@ -80,9 +123,8 @@ export default function ArticleFormPanel({
     }
   }, [article?.bodyContent]);
 
-  // Auto-set orgId for contributors if there's only one org available
   useEffect(() => {
-    if (isContributorMode && availableOrgs.length === 1 && !orgId) {
+    if (isContributorMode && availableOrgs.length === 1 && orgId === NO_ORG) {
       setOrgId(availableOrgs[0].id.toString());
     }
   }, [isContributorMode, availableOrgs, orgId]);
@@ -116,7 +158,8 @@ export default function ArticleFormPanel({
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
-    const parsedOrgId = orgId ? BigInt(orgId) : null;
+    // Treat sentinel as "no org selected"
+    const parsedOrgId = orgId && orgId !== NO_ORG ? BigInt(orgId) : null;
     const parsedPubDate = pubDate
       ? `${pubDate}T00:00:00Z`
       : new Date().toISOString();
@@ -147,7 +190,6 @@ export default function ArticleFormPanel({
           bodyContent,
           tags: parsedTags,
         });
-        // Only admins can sync publish state directly
         if (!isContributorMode) {
           if (isPublished && !article.isPublished) {
             await publishArticle(article.id);
@@ -258,7 +300,7 @@ export default function ArticleFormPanel({
             </SelectTrigger>
             <SelectContent className="bg-black border-white/20 text-white">
               {!isContributorMode && (
-                <SelectItem value="" className="font-sans text-white/50">
+                <SelectItem value={NO_ORG} className="font-sans text-white/50">
                   None
                 </SelectItem>
               )}
@@ -355,7 +397,6 @@ export default function ArticleFormPanel({
         <Label className="text-white/40 text-[10px] uppercase tracking-widest font-sans">
           Body
         </Label>
-        {/* Toolbar */}
         <div className="flex flex-wrap gap-1 border border-white/10 border-b-0 px-2 py-1.5 bg-white/5">
           {[
             { label: "B", cmd: "bold", style: "font-bold" },
@@ -453,5 +494,13 @@ export default function ArticleFormPanel({
         </button>
       </div>
     </div>
+  );
+}
+
+export default function ArticleFormPanel(props: ArticleFormPanelProps) {
+  return (
+    <FormErrorBoundary>
+      <ArticleFormInner {...props} />
+    </FormErrorBoundary>
   );
 }

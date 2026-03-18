@@ -65,7 +65,7 @@ export default function ArticleCard({
             )}
           </span>
           <span className="text-white/20">·</span>
-          <span>{formatDate(article.publicationDate)}</span>
+          <span>{formatDate(article.publicationDate, article.createdAt)}</span>
           {org && (
             <>
               <span className="text-white/20">·</span>
