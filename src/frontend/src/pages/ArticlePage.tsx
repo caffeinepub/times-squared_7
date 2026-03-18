@@ -26,6 +26,12 @@ function BlobImage({
   return <img src={url} alt="" className={className} style={style} />;
 }
 
+const stripHtml = (html: string) => {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || "";
+};
+
 export default function ArticlePage({ id }: ArticlePageProps) {
   let articleId: bigint | null = null;
   try {
@@ -57,7 +63,7 @@ export default function ArticlePage({ id }: ArticlePageProps) {
       return;
     }
     if (!article) return;
-    const text = `${article.title}. By ${article.author}. ${article.bodyContent}`;
+    const text = `${article.title}. By ${article.author}. ${stripHtml(article.bodyContent)}`;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.95;
     utterance.pitch = 1;
@@ -112,8 +118,6 @@ export default function ArticlePage({ id }: ArticlePageProps) {
       </div>
     );
   }
-
-  const paragraphs = article.bodyContent.split("\n\n");
 
   return (
     <motion.main
@@ -224,20 +228,11 @@ export default function ArticlePage({ id }: ArticlePageProps) {
         )}
 
         {/* Body */}
-        <div className="prose-editorial mb-10">
-          {paragraphs.map((para, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static content
-            <p key={i} /* index stable for static content */>
-              {para.split("\n").map((line, j) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static content
-                <span key={j}>
-                  {j > 0 && <br />}
-                  {line}
-                </span>
-              ))}
-            </p>
-          ))}
-        </div>
+        <div
+          className="prose-editorial mb-10"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: article body is authored content
+          dangerouslySetInnerHTML={{ __html: article.bodyContent }}
+        />
 
         {/* Hero Image 2 */}
         {article.heroImageBlobId2 && (
