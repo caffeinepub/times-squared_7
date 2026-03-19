@@ -88,6 +88,8 @@ export default function NavDrawer({
 
   const navLinks = [
     { label: "Home", path: "/", ocid: "nav.home.link" },
+    { label: "Team", path: "/team", ocid: "nav.team.link" },
+    { label: "Whitepaper", path: "/whitepaper", ocid: "nav.whitepaper.link" },
     { label: "Privacy", path: "/privacy", ocid: "nav.privacy.link" },
   ];
 
