@@ -3,9 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Article,
   Comment,
+  CrosswordCell,
+  CrosswordClue,
+  backendInterface as FullBackendInterface,
   OrgInvite,
   OrgMembership,
   OrgSection,
+  Puzzle,
+  PuzzleType,
   SubmissionWithArticle,
   UserProfile,
   UserRole,
@@ -20,18 +25,6 @@ export function useGetPublishedArticles() {
     queryFn: async () => {
       if (!actor) return [];
       return actor.getPublishedArticles();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useGetFeaturedArticle() {
-  const { actor, isFetching } = useActor();
-  return useQuery<Article | null>({
-    queryKey: ["featuredArticle"],
-    queryFn: async () => {
-      if (!actor) return null;
-      return actor.getFeaturedArticle();
     },
     enabled: !!actor && !isFetching,
   });
@@ -225,7 +218,7 @@ export function useSaveCallerUserProfile() {
 
 // ─── Admin Queries ────────────────────────────────────────────────────────────
 
-const articleKeys = ["allArticles", "publishedArticles", "featuredArticle"];
+const articleKeys = ["allArticles", "publishedArticles"];
 
 export function useGetAllArticles() {
   const { actor, isFetching } = useActor();
@@ -680,6 +673,109 @@ export function useDeleteComment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["comments"] });
+    },
+  });
+}
+
+// ─── Puzzle Queries ───────────────────────────────────────────────────────────
+
+// The generated backend.ts interface lacks puzzle methods; cast actor at call sites.
+function puzzleActor(actor: unknown): FullBackendInterface {
+  return actor as FullBackendInterface;
+}
+
+export function useGetAllPuzzles() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Puzzle[]>({
+    queryKey: ["allPuzzles"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return puzzleActor(actor).getAllPuzzles();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useCreatePuzzle() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      puzzleType: PuzzleType;
+      title: string;
+      gridWidth: bigint;
+      gridHeight: bigint;
+      cells: CrosswordCell[];
+      clues: CrosswordClue[];
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return puzzleActor(actor).createPuzzle(
+        args.puzzleType,
+        args.title,
+        args.gridWidth,
+        args.gridHeight,
+        args.cells,
+        args.clues,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allPuzzles"] });
+    },
+  });
+}
+
+export function useUpdatePuzzle() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      id: bigint;
+      title: string;
+      gridWidth: bigint;
+      gridHeight: bigint;
+      cells: CrosswordCell[];
+      clues: CrosswordClue[];
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return puzzleActor(actor).updatePuzzle(
+        args.id,
+        args.title,
+        args.gridWidth,
+        args.gridHeight,
+        args.cells,
+        args.clues,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allPuzzles"] });
+    },
+  });
+}
+
+export function useDeletePuzzle() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return puzzleActor(actor).deletePuzzle(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allPuzzles"] });
+    },
+  });
+}
+
+export function useSetActivePuzzle() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return puzzleActor(actor).setActivePuzzle(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allPuzzles"] });
     },
   });
 }

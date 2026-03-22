@@ -13,11 +13,12 @@ import {
 import { navigate } from "../lib/navigate";
 import ArticleListPanel from "./admin/ArticleListPanel";
 import OrgManagementPanel from "./admin/OrgManagementPanel";
+import PuzzlePanel from "./admin/PuzzlePanel";
 import SubmissionsPanel from "./admin/SubmissionsPanel";
 import UserRolePanel from "./admin/UserRolePanel";
 import MySubmissionsPanel from "./contributor/MySubmissionsPanel";
 
-type AdminPanel = "articles" | "orgs" | "users" | "submissions";
+type AdminPanel = "articles" | "orgs" | "users" | "submissions" | "games";
 type ContributorPanel = "my-drafts";
 type DrawerPanel = AdminPanel | ContributorPanel | null;
 
@@ -258,6 +259,15 @@ export default function NavDrawer({
                           Users
                           <span className="text-white/20 text-xs">→</span>
                         </button>
+                        <button
+                          type="button"
+                          data-ocid="nav.admin.games.link"
+                          onClick={() => setActivePanel("games")}
+                          className="text-left text-white/60 hover:text-white font-sans text-sm py-2.5 border-b border-white/10 transition-colors flex items-center justify-between"
+                        >
+                          Games
+                          <span className="text-white/20 text-xs">→</span>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -288,6 +298,12 @@ export default function NavDrawer({
               {activePanel === "users" && (
                 <div className="p-6">
                   <UserRolePanel />
+                </div>
+              )}
+
+              {activePanel === "games" && (
+                <div className="p-6">
+                  <PuzzlePanel />
                 </div>
               )}
 

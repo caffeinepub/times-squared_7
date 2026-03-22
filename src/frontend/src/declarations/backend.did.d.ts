@@ -142,7 +142,6 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCommentsByArticle' : ActorMethod<[bigint], Array<Comment>>,
-  'getFeaturedArticle' : ActorMethod<[], [] | [Article]>,
   'getMyInvites' : ActorMethod<[], Array<OrgInvite>>,
   'getMyMemberships' : ActorMethod<[], Array<OrgMembership>>,
   'getMyOrgs' : ActorMethod<[], Array<OrgSection>>,

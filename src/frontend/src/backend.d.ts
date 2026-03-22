@@ -69,6 +69,33 @@ export interface UserProfile {
     name: string;
     avatarBlobId?: string;
 }
+export interface CrosswordCell {
+    letter: string;
+    isBlack: boolean;
+    number?: bigint;
+}
+export interface CrosswordClue {
+    number: bigint;
+    direction: ClueDirection;
+    clue: string;
+    answer: string;
+    startRow: bigint;
+    startCol: bigint;
+    length: bigint;
+}
+export interface Puzzle {
+    id: bigint;
+    puzzleType: PuzzleType;
+    title: string;
+    gridWidth: bigint;
+    gridHeight: bigint;
+    cells: Array<CrosswordCell>;
+    clues: Array<CrosswordClue>;
+    isActive: boolean;
+    createdAt: bigint;
+    publishedAt?: bigint;
+    createdBy: Principal;
+}
 export enum OrgInviteStatus {
     pending = "pending",
     accepted = "accepted",
@@ -84,6 +111,14 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
+export enum PuzzleType {
+    mini = "mini",
+    standard = "standard"
+}
+export enum ClueDirection {
+    across = "across",
+    down = "down"
+}
 export interface backendInterface {
     addComment(articleId: bigint, body: string): Promise<void>;
     approveArticleSubmission(articleId: bigint): Promise<void>;
@@ -91,11 +126,15 @@ export interface backendInterface {
     claimSuperAdmin(): Promise<void>;
     createArticle(title: string, author: string, authorPrincipal: Principal | null, organizationId: bigint | null, publicationDate: string, imageBlobIds: Array<string>, bodyContent: string, tags: Array<string>): Promise<bigint>;
     createOrg(name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<bigint>;
+    createPuzzle(puzzleType: PuzzleType, title: string, gridWidth: bigint, gridHeight: bigint, cells: Array<CrosswordCell>, clues: Array<CrosswordClue>): Promise<bigint>;
     deleteArticle(articleId: bigint): Promise<void>;
     deleteComment(commentId: bigint): Promise<void>;
     deleteOrg(orgId: bigint): Promise<void>;
+    deletePuzzle(id: bigint): Promise<void>;
     featureArticle(articleId: bigint): Promise<void>;
     getAllArticles(): Promise<Array<Article>>;
+    getAllPuzzles(): Promise<Array<Puzzle>>;
+    getActivePuzzle(puzzleType: PuzzleType): Promise<Puzzle | null>;
     getArticleById(articleId: bigint): Promise<Article>;
     getArticlesByOrg(orgId: bigint): Promise<Array<Article>>;
     getArticlesByTag(tag: string): Promise<Array<Article>>;
@@ -103,7 +142,6 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getCommentsByArticle(articleId: bigint): Promise<Array<Comment>>;
-    getFeaturedArticle(): Promise<Article | null>;
     getMyInvites(): Promise<Array<OrgInvite>>;
     getMyMemberships(): Promise<Array<OrgMembership>>;
     getMyOrgs(): Promise<Array<OrgSection>>;
@@ -125,9 +163,11 @@ export interface backendInterface {
     respondToOrgInvite(inviteId: bigint, accept: boolean): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchArticles(queryText: string): Promise<Array<Article>>;
+    setActivePuzzle(id: bigint): Promise<void>;
     submitArticleForReview(articleId: bigint): Promise<void>;
     unfeatureArticle(articleId: bigint): Promise<void>;
     unpublishArticle(articleId: bigint): Promise<void>;
     updateArticle(articleId: bigint, title: string, author: string, organizationId: bigint | null, publicationDate: string, imageBlobIds: Array<string>, bodyContent: string, tags: Array<string>): Promise<void>;
     updateOrg(orgId: bigint, name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<void>;
+    updatePuzzle(id: bigint, title: string, gridWidth: bigint, gridHeight: bigint, cells: Array<CrosswordCell>, clues: Array<CrosswordClue>): Promise<void>;
 }

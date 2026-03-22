@@ -13,8 +13,6 @@ import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import MixinStorage "blob-storage/Mixin";
 
-
-
 actor {
   type Article = {
     id : Nat;
@@ -110,6 +108,51 @@ actor {
     };
   };
 
+  // === CROSSWORD TYPES ===
+
+  type PuzzleType = { #mini; #standard };
+
+  type ClueDirection = { #across; #down };
+
+  // A single cell in the crossword grid. Black cells have isBlack=true, letter="".
+  type CrosswordCell = {
+    letter : Text;
+    isBlack : Bool;
+    number : ?Nat;
+  };
+
+  // A clue entry with placement info for rendering the interactive grid.
+  type CrosswordClue = {
+    number : Nat;
+    direction : ClueDirection;
+    clue : Text;
+    answer : Text;
+    startRow : Nat;
+    startCol : Nat;
+    length : Nat;
+  };
+
+  // A published puzzle. cells is a flat row-major array (index = row * gridWidth + col).
+  type Puzzle = {
+    id : Nat;
+    puzzleType : PuzzleType;
+    title : Text;
+    gridWidth : Nat;
+    gridHeight : Nat;
+    cells : [CrosswordCell];
+    clues : [CrosswordClue];
+    isActive : Bool;
+    createdAt : Int;
+    publishedAt : ?Int;
+    createdBy : Principal;
+  };
+
+  module Puzzle {
+    public func compare(p1 : Puzzle, p2 : Puzzle) : Order.Order {
+      Int.compare(p2.createdAt, p1.createdAt);
+    };
+  };
+
   // State
   include MixinStorage();
   let accessControlState = AccessControl.initState();
@@ -121,19 +164,141 @@ actor {
 
   // stable var ensures superAdmin principal persists across upgrades
   stable var superAdmin : ?Principal = null;
-  stable var orgOwners = Map.empty<Nat, Principal>();
+  var orgOwners = Map.empty<Nat, Principal>();
 
-  // Storage persistent vars
-  stable var articles = Map.empty<Nat, Article>();
-  stable var userProfiles = Map.empty<Principal, UserProfile>();
-  stable var organizations = Map.empty<Nat, OrgSection>();
-  stable var orgInvites = Map.empty<Nat, OrgInvite>();
-  stable var orgMemberships = Map.empty<Text, OrgMembership>();
-  stable var articleSubmissions = Map.empty<Nat, ArticleSubmission>();
+  // Storage persistent vars (Maps are implicitly stable)
+  var articles = Map.empty<Nat, Article>();
+  var userProfiles = Map.empty<Principal, UserProfile>();
+  var organizations = Map.empty<Nat, OrgSection>();
+  var orgInvites = Map.empty<Nat, OrgInvite>();
+  var orgMemberships = Map.empty<Text, OrgMembership>();
+  var articleSubmissions = Map.empty<Nat, ArticleSubmission>();
 
-  // === NEW COMMENTS LOGIC ===
-  stable var comments = Map.empty<Nat, Comment>();
+  var comments = Map.empty<Nat, Comment>();
   stable var commentIdCounter = 0;
+
+  // Puzzle persistent storage (Maps are implicitly stable)
+  var puzzles = Map.empty<Nat, Puzzle>();
+  stable var puzzleIdCounter = 0;
+
+  // === PUZZLE MANAGEMENT ===
+
+  public shared ({ caller }) func createPuzzle(
+    puzzleType : PuzzleType,
+    title : Text,
+    gridWidth : Nat,
+    gridHeight : Nat,
+    cells : [CrosswordCell],
+    clues : [CrosswordClue],
+  ) : async Nat {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can create puzzles");
+    };
+
+    let puzzle : Puzzle = {
+      id = puzzleIdCounter;
+      puzzleType;
+      title;
+      gridWidth;
+      gridHeight;
+      cells;
+      clues;
+      isActive = false;
+      createdAt = Time.now();
+      publishedAt = null;
+      createdBy = caller;
+    };
+
+    puzzles.add(puzzleIdCounter, puzzle);
+    puzzleIdCounter += 1;
+    puzzle.id;
+  };
+
+  public shared ({ caller }) func updatePuzzle(
+    id : Nat,
+    title : Text,
+    gridWidth : Nat,
+    gridHeight : Nat,
+    cells : [CrosswordCell],
+    clues : [CrosswordClue],
+  ) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can update puzzles");
+    };
+
+    switch (puzzles.get(id)) {
+      case (null) { Runtime.trap("Puzzle not found") };
+      case (?existing) {
+        let updated : Puzzle = {
+          existing with
+          title;
+          gridWidth;
+          gridHeight;
+          cells;
+          clues;
+        };
+        puzzles.add(id, updated);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deletePuzzle(id : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can delete puzzles");
+    };
+
+    switch (puzzles.get(id)) {
+      case (null) { Runtime.trap("Puzzle not found") };
+      case (_) { puzzles.remove(id) };
+    };
+  };
+
+  // Activate a puzzle. Deactivates all other puzzles of the same type.
+  public shared ({ caller }) func setActivePuzzle(id : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can activate puzzles");
+    };
+
+    switch (puzzles.get(id)) {
+      case (null) { Runtime.trap("Puzzle not found") };
+      case (?target) {
+        // Deactivate all puzzles of the same type
+        for ((pid, puzzle) in puzzles.entries()) {
+          if (puzzle.puzzleType == target.puzzleType and puzzle.isActive) {
+            puzzles.add(pid, { puzzle with isActive = false });
+          };
+        };
+        // Activate the target puzzle
+        let now = Time.now();
+        let activated : Puzzle = {
+          target with
+          isActive = true;
+          publishedAt = if (target.publishedAt == null) { ?now } else {
+            target.publishedAt;
+          };
+        };
+        puzzles.add(id, activated);
+      };
+    };
+  };
+
+  public query func getActivePuzzle(puzzleType : PuzzleType) : async ?Puzzle {
+    for ((_, puzzle) in puzzles.entries()) {
+      if (puzzle.puzzleType == puzzleType and puzzle.isActive) {
+        return ?puzzle;
+      };
+    };
+    null;
+  };
+
+  public query ({ caller }) func getAllPuzzles() : async [Puzzle] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can view all puzzles");
+    };
+    puzzles.values().toArray().sort();
+  };
+
+  // === COMMENTS ===
 
   public shared ({ caller }) func addComment(articleId : Nat, body : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -178,7 +343,7 @@ actor {
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment does not exist") };
       case (?comment) {
-        // Author can always delete
+        // Author can always delete their own comment
         if (comment.authorPrincipal == caller) {
           comments.remove(commentId);
           return;
@@ -190,7 +355,7 @@ actor {
           return;
         };
 
-        // Organization admins can delete any comment on their article
+        // Organization admins can delete comments on their articles
         switch (articles.get(comment.articleId)) {
           case (?article) {
             switch (article.organizationId) {
@@ -211,7 +376,7 @@ actor {
     };
   };
 
-  // === EXISTING LOGIC BELOW ===
+  // === EXISTING LOGIC ===
 
   func isSuperAdmin(caller : Principal) : Bool {
     switch (superAdmin) {
@@ -260,7 +425,6 @@ actor {
         plain #= Text.fromChar(c);
       };
     };
-    // Trim leading/trailing whitespace chars
     let trimmed = plain.trimStart(#predicate(func(c) { c == ' ' or c == '\n' or c == '\t' })).trimEnd(#predicate(func(c) { c == ' ' or c == '\n' or c == '\t' }));
     if (trimmed.size() > maxLen) {
       var i = 0;
@@ -697,7 +861,6 @@ actor {
             };
           };
         };
-        // Allow multiple featured articles -- each is a pin that floats to the top
         let updatedArticle = { existingArticle with isFeatured = true };
         articles.add(articleId, updatedArticle);
       };
@@ -724,7 +887,7 @@ actor {
     };
   };
 
-  // === B2: SUBMISSION WORKFLOW ===
+  // === SUBMISSION WORKFLOW ===
 
   public shared ({ caller }) func submitArticleForReview(articleId : Nat) : async () {
     switch (articles.get(articleId)) {
@@ -899,23 +1062,6 @@ actor {
     });
   };
 
-  public query func getFeaturedArticle() : async ?Article {
-    let featured = articles.values().filter(
-      func(article) { article.isFeatured }
-    );
-    switch (featured.size()) {
-      case (0) { null };
-      case (_) {
-        let articlesArray = featured.toArray();
-        if (articlesArray.size() > 0) {
-          ?articlesArray[0];
-        } else {
-          null;
-        };
-      };
-    };
-  };
-
   public query func searchArticles(queryText : Text) : async [Article] {
     articles.values().filter(
       func(article) {
@@ -929,7 +1075,7 @@ actor {
     for (article in articles.values()) {
       switch (article.authorPrincipal) {
         case (?principal) {
-          if (principal == authorPrincipal) {
+          if (principal == authorPrincipal and article.isPublished) {
             authorArticles.add(article);
           };
         };

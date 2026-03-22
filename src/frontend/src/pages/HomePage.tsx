@@ -4,11 +4,7 @@ import { useState } from "react";
 import { ExternalBlob } from "../backend";
 import ArticleCard from "../components/ArticleCard";
 import ArticleCardSkeleton from "../components/ArticleCardSkeleton";
-import {
-  useGetFeaturedArticle,
-  useGetOrgs,
-  useGetPublishedArticles,
-} from "../hooks/useQueries";
+import { useGetOrgs, useGetPublishedArticles } from "../hooks/useQueries";
 import { getExcerpt } from "../lib/excerpt";
 import { formatDate, navigate } from "../lib/navigate";
 
@@ -51,12 +47,10 @@ function HeroImage({ blobId }: { blobId: string }) {
 
 export default function HomePage() {
   const { data: published = [], isLoading } = useGetPublishedArticles();
-  const { data: featured } = useGetFeaturedArticle();
   const { data: orgs = [] } = useGetOrgs();
   const [copied, setCopied] = useState(false);
 
-  const featuredArticle =
-    featured ?? (published.length > 0 ? published[0] : null);
+  const featuredArticle = published.length > 0 ? published[0] : null;
   const otherArticles = published.filter((a) => a.id !== featuredArticle?.id);
 
   const coverImageBlobId = featuredArticle?.imageBlobIds[0] ?? null;
@@ -157,7 +151,7 @@ export default function HomePage() {
 
           {isLoading ? (
             <div data-ocid="home.loading_state">
-              {["h1", "h2", "h3", "h4"].map((k) => (
+              {["h1", "h2", "h3"].map((k) => (
                 <ArticleCardSkeleton key={k} />
               ))}
             </div>
@@ -171,7 +165,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div>
-              {otherArticles.map((article, i) => (
+              {otherArticles.slice(0, 3).map((article, i) => (
                 <ArticleCard
                   key={article.id.toString()}
                   article={article}

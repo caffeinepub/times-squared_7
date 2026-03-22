@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { motion } from "motion/react";
+import type React from "react";
 import { useState } from "react";
 import type { Article, OrgSection } from "../backend.d";
 import { getExcerpt } from "../lib/excerpt";

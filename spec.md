@@ -1,21 +1,34 @@
 # Times Squared
 
 ## Current State
-ArticleCard.tsx renders a domain overlay (`times-squared-51a.caffeine.xyz`) bottom-left on article card images inside the app. This was intended to mimic the Guardian link preview style but was incorrectly applied to in-app cards. index.html has no Open Graph or Twitter Card meta tags, causing shared article links on X to show "404 NOT FOUND" instead of a rich preview card.
+Full editorial platform on ICP with articles, comments, multi-image support, org management, contributor workflow, role-based auth, and support/donation flow. Backend is clean Motoko with all state in `stable var` maps.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Open Graph meta tags in `index.html`: `og:type`, `og:site_name`, `og:title`, `og:description`, `og:url`, `og:image`, `twitter:card`, `twitter:site`, `twitter:title`, `twitter:description`, `twitter:image`. Use the live app domain `https://times-squared-51a.caffeine.xyz` and publication branding.
-- A static OG image: use a plain black card with the Times² wordmark text (can reference a generated asset or leave as absolute URL to a hosted image; use the live domain URL pattern).
-- Populate the `<title>` tag with `Times²`.
+- `Puzzle` type: id, puzzleType (#mini | #standard), title, gridWidth, gridHeight, cells (flat array of CrosswordCell), clues ([CrosswordClue]), isActive, createdAt, publishedAt, createdBy
+- `CrosswordCell` type: letter (Text, empty = black), isBlack, number (?Nat)
+- `CrosswordClue` type: number, direction (#across | #down), clue (Text), answer (Text), startRow, startCol, length
+- `stable var puzzles = Map.empty<Nat, Puzzle>()`
+- `stable var puzzleIdCounter = 0`
+- `createPuzzle(puzzleType, title, gridWidth, gridHeight, cells, clues)` - admin only, returns Nat id
+- `updatePuzzle(id, title, gridWidth, gridHeight, cells, clues)` - admin only
+- `deletePuzzle(id)` - admin only
+- `setActivePuzzle(id)` - admin only, deactivates all other puzzles of same type, activates this one
+- `getActivePuzzle(puzzleType)` - public query, returns ?Puzzle
+- `getAllPuzzles()` - admin query, returns all puzzles sorted newest first
+- Admin panel: new "Games" section with puzzle list, create/edit form, preview, publish toggle
 
 ### Modify
-- `ArticleCard.tsx`: remove the ICP domain overlay div (the `{/* ICP domain overlay — Guardian style */}` block and its contents) entirely. No other changes to the card.
+- Admin drawer: add "Games" section entry point alongside Article List and Org Management
 
 ### Remove
-- Domain overlay UI from in-app article cards.
+- Nothing
 
 ## Implementation Plan
-1. Edit `src/frontend/index.html`: add `<title>Times²</title>` and all OG/Twitter meta tags with static publication-level values.
-2. Edit `src/frontend/src/components/ArticleCard.tsx`: delete the domain overlay absolute-positioned div from inside the image block.
+1. Add Puzzle types and stable vars to main.mo
+2. Implement createPuzzle, updatePuzzle, deletePuzzle, setActivePuzzle, getActivePuzzle, getAllPuzzles
+3. Generate updated backend.d.ts bindings
+4. Frontend: crossword grid auto-generation algorithm in TypeScript (place words on grid, compute intersections, assign numbers, fill black cells)
+5. Admin panel Games section: puzzle list view showing Mini/Standard with active status, create/edit form with word+clue inputs, auto-generate preview, publish button
+6. Words are entered as a list (word + clue pairs); frontend runs placement algorithm to produce the grid layout for preview before saving

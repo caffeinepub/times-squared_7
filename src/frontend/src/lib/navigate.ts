@@ -32,7 +32,3 @@ export function formatDate(dateStr: string, createdAtNs?: bigint): string {
 
   return "";
 }
-
-export function copyToClipboard(text: string): Promise<void> {
-  return navigator.clipboard.writeText(text);
-}
