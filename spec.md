@@ -1,32 +1,21 @@
 # Times Squared
 
 ## Current State
-
-The frontend has most Step 4 polish already in place from prior builds:
-- Article cards have staggered fade-in animations (motion.article with delay)
-- Loading skeleton (ArticleCardSkeleton) is used in HomePage
-- ICP domain URL overlay already exists on article card images (Guardian style)
-- Typography in prose-editorial already has line-height 1.85
-
-Missing: estimated read time on article cards.
+ArticleCard.tsx renders a domain overlay (`times-squared-51a.caffeine.xyz`) bottom-left on article card images inside the app. This was intended to mimic the Guardian link preview style but was incorrectly applied to in-app cards. index.html has no Open Graph or Twitter Card meta tags, causing shared article links on X to show "404 NOT FOUND" instead of a rich preview card.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Estimated read time display on article cards (word count / 200 wpm, rounded up, e.g. "3 min read") shown in the byline row alongside author and date
+- Open Graph meta tags in `index.html`: `og:type`, `og:site_name`, `og:title`, `og:description`, `og:url`, `og:image`, `twitter:card`, `twitter:site`, `twitter:title`, `twitter:description`, `twitter:image`. Use the live app domain `https://times-squared-51a.caffeine.xyz` and publication branding.
+- A static OG image: use a plain black card with the Times² wordmark text (can reference a generated asset or leave as absolute URL to a hosted image; use the live domain URL pattern).
+- Populate the `<title>` tag with `Times²`.
 
 ### Modify
-- Article card byline: add read time after date, separated by a dot divider
-- Admin drawer spacing: tighten padding from p-5/p-6 to p-4, reduce gaps slightly
-- Button hover transitions: ensure all interactive buttons have `transition-all duration-200`
-- Article body typography: verify line-height and paragraph spacing in prose-editorial class
+- `ArticleCard.tsx`: remove the ICP domain overlay div (the `{/* ICP domain overlay — Guardian style */}` block and its contents) entirely. No other changes to the card.
 
 ### Remove
-- Nothing
+- Domain overlay UI from in-app article cards.
 
 ## Implementation Plan
-
-1. Add `getReadTime(body: string): string` utility in `src/frontend/src/lib/readTime.ts` that strips HTML, counts words, divides by 200, rounds up, returns e.g. `"3 min read"`
-2. Import and use in `ArticleCard.tsx` — add read time to byline row
-3. Tighten admin drawer padding/spacing in any admin panel components
-4. Verify hover transitions on key interactive elements
+1. Edit `src/frontend/index.html`: add `<title>Times²</title>` and all OG/Twitter meta tags with static publication-level values.
+2. Edit `src/frontend/src/components/ArticleCard.tsx`: delete the domain overlay absolute-positioned div from inside the image block.

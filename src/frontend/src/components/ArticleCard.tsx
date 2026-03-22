@@ -62,20 +62,6 @@ export default function ArticleCard({
               style={{ height: "200px" }}
               onClick={handleCardClick}
             />
-            {/* ICP domain overlay — Guardian style */}
-            <div className="absolute bottom-2 left-2 pointer-events-none">
-              <span
-                className="text-white/70 font-sans"
-                style={{
-                  fontSize: "10px",
-                  background: "rgba(0,0,0,0.55)",
-                  padding: "2px 6px",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {window.location.hostname}
-              </span>
-            </div>
           </div>
         )}
 
