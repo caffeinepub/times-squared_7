@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ExternalBlob } from "../backend";
+import CommentsSection from "../components/CommentsSection";
 import { useGetArticleById, useGetOrgById } from "../hooks/useQueries";
 import { formatDate, navigate } from "../lib/navigate";
 
@@ -18,8 +19,12 @@ function BlobImage({
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const blob = ExternalBlob.fromURL(blobId);
-    setUrl(blob.getDirectURL());
+    try {
+      const blob = ExternalBlob.fromURL(blobId);
+      setUrl(blob.getDirectURL());
+    } catch {
+      // ignore bad blobId
+    }
   }, [blobId]);
 
   if (!url) return null;
@@ -119,6 +124,9 @@ export default function ArticlePage({ id }: ArticlePageProps) {
     );
   }
 
+  const coverImageId = article.imageBlobIds[0] ?? null;
+  const extraImageIds = article.imageBlobIds.slice(1);
+
   return (
     <motion.main
       data-ocid="article.page"
@@ -216,11 +224,11 @@ export default function ArticlePage({ id }: ArticlePageProps) {
 
         <div className="divider-white mb-10" />
 
-        {/* Hero Image 1 */}
-        {article.heroImageBlobId && (
+        {/* Cover Image */}
+        {coverImageId && (
           <div className="mb-10 -mx-6">
             <BlobImage
-              blobId={article.heroImageBlobId}
+              blobId={coverImageId}
               className="w-full object-cover"
               style={{ maxHeight: "520px" }}
             />
@@ -234,21 +242,29 @@ export default function ArticlePage({ id }: ArticlePageProps) {
           dangerouslySetInnerHTML={{ __html: article.bodyContent }}
         />
 
-        {/* Hero Image 2 */}
-        {article.heroImageBlobId2 && (
+        {/* Additional images thumbnail strip */}
+        {extraImageIds.length > 0 && (
           <div className="mb-10 -mx-6">
-            <BlobImage
-              blobId={article.heroImageBlobId2}
-              className="w-full object-cover"
-              style={{ maxHeight: "520px" }}
-            />
+            <div className="flex gap-2 overflow-x-auto px-6 pb-2">
+              {extraImageIds.map((blobId) => (
+                <div
+                  key={blobId}
+                  className="flex-shrink-0 w-32 h-24 overflow-hidden"
+                >
+                  <BlobImage
+                    blobId={blobId}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         <div className="divider-subtle mb-10" />
 
         {/* Tip section */}
-        <section data-ocid="article.tip.section" className="mb-16">
+        <section data-ocid="article.tip.section" className="mb-8">
           <p className="italic text-white/40 font-sans text-sm leading-relaxed mb-4">
             This isn&apos;t a coffee shop. Nobody&apos;s watching. Only tip if
             you want to.
@@ -268,6 +284,31 @@ export default function ArticlePage({ id }: ArticlePageProps) {
             </button>
           </div>
         </section>
+
+        {/* Support callout */}
+        <section
+          data-ocid="article.support.callout"
+          className="mb-8 border border-white/10 p-6"
+        >
+          <p className="font-editorial text-white text-lg mb-2">
+            Support this publication
+          </p>
+          <p className="text-white/50 font-sans text-sm leading-relaxed mb-4">
+            Times² is funded entirely by readers. No ads, no trackers, no
+            corporate backing.
+          </p>
+          <button
+            type="button"
+            data-ocid="article.support.button"
+            onClick={() => navigate("/support")}
+            className="text-white/60 hover:text-white font-sans text-xs uppercase tracking-widest transition-colors"
+          >
+            Learn how to contribute →
+          </button>
+        </section>
+
+        {/* Comments */}
+        {articleId !== null && <CommentsSection articleId={articleId} />}
       </div>
 
       {/* Read Aloud button */}

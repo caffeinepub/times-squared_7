@@ -30,14 +30,13 @@ export const Article = IDL.Record({
   'bodyContent' : IDL.Text,
   'title' : IDL.Text,
   'isPublished' : IDL.Bool,
+  'imageBlobIds' : IDL.Vec(IDL.Text),
   'createdAt' : IDL.Int,
   'tags' : IDL.Vec(IDL.Text),
   'author' : IDL.Text,
   'isFeatured' : IDL.Bool,
   'publicationDate' : IDL.Text,
-  'heroImageBlobId2' : IDL.Opt(IDL.Text),
   'excerpt' : IDL.Text,
-  'heroImageBlobId' : IDL.Opt(IDL.Text),
   'authorPrincipal' : IDL.Opt(IDL.Principal),
 });
 export const UserProfile = IDL.Record({
@@ -46,6 +45,14 @@ export const UserProfile = IDL.Record({
   'orgId' : IDL.Opt(IDL.Nat),
   'name' : IDL.Text,
   'avatarBlobId' : IDL.Opt(IDL.Text),
+});
+export const Comment = IDL.Record({
+  'id' : IDL.Nat,
+  'body' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'authorName' : IDL.Text,
+  'articleId' : IDL.Nat,
+  'authorPrincipal' : IDL.Principal,
 });
 export const OrgInviteStatus = IDL.Variant({
   'pending' : IDL.Null,
@@ -73,6 +80,21 @@ export const OrgSection = IDL.Record({
   'slug' : IDL.Text,
   'description' : IDL.Text,
   'logoBlobId' : IDL.Opt(IDL.Text),
+});
+export const SubmissionStatus = IDL.Variant({
+  'pending_review' : IDL.Null,
+  'rejected' : IDL.Null,
+  'draft' : IDL.Null,
+});
+export const ArticleSubmission = IDL.Record({
+  'submittedAt' : IDL.Opt(IDL.Int),
+  'submissionStatus' : SubmissionStatus,
+  'articleId' : IDL.Nat,
+  'rejectionNote' : IDL.Opt(IDL.Text),
+});
+export const SubmissionWithArticle = IDL.Record({
+  'article' : Article,
+  'submission' : ArticleSubmission,
 });
 
 export const idlService = IDL.Service({
@@ -103,6 +125,8 @@ export const idlService = IDL.Service({
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addComment' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+  'approveArticleSubmission' : IDL.Func([IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'claimSuperAdmin' : IDL.Func([], [], []),
   'createArticle' : IDL.Func(
@@ -112,8 +136,7 @@ export const idlService = IDL.Service({
         IDL.Opt(IDL.Principal),
         IDL.Opt(IDL.Nat),
         IDL.Text,
-        IDL.Opt(IDL.Text),
-        IDL.Opt(IDL.Text),
+        IDL.Vec(IDL.Text),
         IDL.Text,
         IDL.Vec(IDL.Text),
       ],
@@ -126,6 +149,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'deleteArticle' : IDL.Func([IDL.Nat], [], []),
+  'deleteComment' : IDL.Func([IDL.Nat], [], []),
   'deleteOrg' : IDL.Func([IDL.Nat], [], []),
   'featureArticle' : IDL.Func([IDL.Nat], [], []),
   'getAllArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
@@ -139,14 +163,25 @@ export const idlService = IDL.Service({
     ),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getCommentsByArticle' : IDL.Func([IDL.Nat], [IDL.Vec(Comment)], ['query']),
   'getFeaturedArticle' : IDL.Func([], [IDL.Opt(Article)], ['query']),
   'getMyInvites' : IDL.Func([], [IDL.Vec(OrgInvite)], ['query']),
   'getMyMemberships' : IDL.Func([], [IDL.Vec(OrgMembership)], ['query']),
   'getMyOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
+  'getMySubmissions' : IDL.Func(
+      [],
+      [IDL.Vec(SubmissionWithArticle)],
+      ['query'],
+    ),
   'getOrgArticles' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
-  'getOrgById' : IDL.Func([IDL.Nat], [OrgSection], ['query']),
+  'getOrgById' : IDL.Func([IDL.Nat], [IDL.Opt(OrgSection)], ['query']),
   'getOrgMembers' : IDL.Func([IDL.Nat], [IDL.Vec(OrgMembership)], ['query']),
   'getOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
+  'getPendingSubmissions' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(SubmissionWithArticle)],
+      ['query'],
+    ),
   'getPublishedArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
   'getSuperAdmin' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
   'getUserProfile' : IDL.Func(
@@ -158,10 +193,12 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [IDL.Bool], ['query']),
   'publishArticle' : IDL.Func([IDL.Nat], [], []),
+  'rejectArticleSubmission' : IDL.Func([IDL.Nat, IDL.Opt(IDL.Text)], [], []),
   'removeOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
   'respondToOrgInvite' : IDL.Func([IDL.Nat, IDL.Bool], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchArticles' : IDL.Func([IDL.Text], [IDL.Vec(Article)], ['query']),
+  'submitArticleForReview' : IDL.Func([IDL.Nat], [], []),
   'unfeatureArticle' : IDL.Func([IDL.Nat], [], []),
   'unpublishArticle' : IDL.Func([IDL.Nat], [], []),
   'updateArticle' : IDL.Func(
@@ -171,8 +208,7 @@ export const idlService = IDL.Service({
         IDL.Text,
         IDL.Opt(IDL.Nat),
         IDL.Text,
-        IDL.Opt(IDL.Text),
-        IDL.Opt(IDL.Text),
+        IDL.Vec(IDL.Text),
         IDL.Text,
         IDL.Vec(IDL.Text),
       ],
@@ -218,14 +254,13 @@ export const idlFactory = ({ IDL }) => {
     'bodyContent' : IDL.Text,
     'title' : IDL.Text,
     'isPublished' : IDL.Bool,
+    'imageBlobIds' : IDL.Vec(IDL.Text),
     'createdAt' : IDL.Int,
     'tags' : IDL.Vec(IDL.Text),
     'author' : IDL.Text,
     'isFeatured' : IDL.Bool,
     'publicationDate' : IDL.Text,
-    'heroImageBlobId2' : IDL.Opt(IDL.Text),
     'excerpt' : IDL.Text,
-    'heroImageBlobId' : IDL.Opt(IDL.Text),
     'authorPrincipal' : IDL.Opt(IDL.Principal),
   });
   const UserProfile = IDL.Record({
@@ -234,6 +269,14 @@ export const idlFactory = ({ IDL }) => {
     'orgId' : IDL.Opt(IDL.Nat),
     'name' : IDL.Text,
     'avatarBlobId' : IDL.Opt(IDL.Text),
+  });
+  const Comment = IDL.Record({
+    'id' : IDL.Nat,
+    'body' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'authorName' : IDL.Text,
+    'articleId' : IDL.Nat,
+    'authorPrincipal' : IDL.Principal,
   });
   const OrgInviteStatus = IDL.Variant({
     'pending' : IDL.Null,
@@ -261,6 +304,21 @@ export const idlFactory = ({ IDL }) => {
     'slug' : IDL.Text,
     'description' : IDL.Text,
     'logoBlobId' : IDL.Opt(IDL.Text),
+  });
+  const SubmissionStatus = IDL.Variant({
+    'pending_review' : IDL.Null,
+    'rejected' : IDL.Null,
+    'draft' : IDL.Null,
+  });
+  const ArticleSubmission = IDL.Record({
+    'submittedAt' : IDL.Opt(IDL.Int),
+    'submissionStatus' : SubmissionStatus,
+    'articleId' : IDL.Nat,
+    'rejectionNote' : IDL.Opt(IDL.Text),
+  });
+  const SubmissionWithArticle = IDL.Record({
+    'article' : Article,
+    'submission' : ArticleSubmission,
   });
   
   return IDL.Service({
@@ -291,6 +349,8 @@ export const idlFactory = ({ IDL }) => {
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addComment' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+    'approveArticleSubmission' : IDL.Func([IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'claimSuperAdmin' : IDL.Func([], [], []),
     'createArticle' : IDL.Func(
@@ -300,8 +360,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(IDL.Principal),
           IDL.Opt(IDL.Nat),
           IDL.Text,
-          IDL.Opt(IDL.Text),
-          IDL.Opt(IDL.Text),
+          IDL.Vec(IDL.Text),
           IDL.Text,
           IDL.Vec(IDL.Text),
         ],
@@ -314,6 +373,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'deleteArticle' : IDL.Func([IDL.Nat], [], []),
+    'deleteComment' : IDL.Func([IDL.Nat], [], []),
     'deleteOrg' : IDL.Func([IDL.Nat], [], []),
     'featureArticle' : IDL.Func([IDL.Nat], [], []),
     'getAllArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
@@ -327,14 +387,25 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getCommentsByArticle' : IDL.Func([IDL.Nat], [IDL.Vec(Comment)], ['query']),
     'getFeaturedArticle' : IDL.Func([], [IDL.Opt(Article)], ['query']),
     'getMyInvites' : IDL.Func([], [IDL.Vec(OrgInvite)], ['query']),
     'getMyMemberships' : IDL.Func([], [IDL.Vec(OrgMembership)], ['query']),
     'getMyOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
+    'getMySubmissions' : IDL.Func(
+        [],
+        [IDL.Vec(SubmissionWithArticle)],
+        ['query'],
+      ),
     'getOrgArticles' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
-    'getOrgById' : IDL.Func([IDL.Nat], [OrgSection], ['query']),
+    'getOrgById' : IDL.Func([IDL.Nat], [IDL.Opt(OrgSection)], ['query']),
     'getOrgMembers' : IDL.Func([IDL.Nat], [IDL.Vec(OrgMembership)], ['query']),
     'getOrgs' : IDL.Func([], [IDL.Vec(OrgSection)], ['query']),
+    'getPendingSubmissions' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(SubmissionWithArticle)],
+        ['query'],
+      ),
     'getPublishedArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
     'getSuperAdmin' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
     'getUserProfile' : IDL.Func(
@@ -346,10 +417,12 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [IDL.Bool], ['query']),
     'publishArticle' : IDL.Func([IDL.Nat], [], []),
+    'rejectArticleSubmission' : IDL.Func([IDL.Nat, IDL.Opt(IDL.Text)], [], []),
     'removeOrgMember' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
     'respondToOrgInvite' : IDL.Func([IDL.Nat, IDL.Bool], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchArticles' : IDL.Func([IDL.Text], [IDL.Vec(Article)], ['query']),
+    'submitArticleForReview' : IDL.Func([IDL.Nat], [], []),
     'unfeatureArticle' : IDL.Func([IDL.Nat], [], []),
     'unpublishArticle' : IDL.Func([IDL.Nat], [], []),
     'updateArticle' : IDL.Func(
@@ -359,8 +432,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Text,
           IDL.Opt(IDL.Nat),
           IDL.Text,
-          IDL.Opt(IDL.Text),
-          IDL.Opt(IDL.Text),
+          IDL.Vec(IDL.Text),
           IDL.Text,
           IDL.Vec(IDL.Text),
         ],

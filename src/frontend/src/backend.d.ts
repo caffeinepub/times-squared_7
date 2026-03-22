@@ -7,21 +7,11 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface Article {
-    id: bigint;
-    organizationId?: bigint;
-    bodyContent: string;
-    title: string;
-    isPublished: boolean;
-    createdAt: bigint;
-    tags: Array<string>;
-    author: string;
-    isFeatured: boolean;
-    publicationDate: string;
-    heroImageBlobId2?: string;
-    excerpt: string;
-    heroImageBlobId?: string;
-    authorPrincipal?: Principal;
+export interface ArticleSubmission {
+    submittedAt?: bigint;
+    submissionStatus: SubmissionStatus;
+    articleId: bigint;
+    rejectionNote?: string;
 }
 export interface OrgInvite {
     status: OrgInviteStatus;
@@ -30,6 +20,18 @@ export interface OrgInvite {
     createdAt: bigint;
     invitedPrincipal: Principal;
     invitedByPrincipal: Principal;
+}
+export interface Comment {
+    id: bigint;
+    body: string;
+    createdAt: bigint;
+    authorName: string;
+    articleId: bigint;
+    authorPrincipal: Principal;
+}
+export interface SubmissionWithArticle {
+    article: Article;
+    submission: ArticleSubmission;
 }
 export interface OrgSection {
     id: bigint;
@@ -45,6 +47,21 @@ export interface OrgMembership {
     memberPrincipal: Principal;
     joinedAt: bigint;
 }
+export interface Article {
+    id: bigint;
+    organizationId?: bigint;
+    bodyContent: string;
+    title: string;
+    isPublished: boolean;
+    imageBlobIds: Array<string>;
+    createdAt: bigint;
+    tags: Array<string>;
+    author: string;
+    isFeatured: boolean;
+    publicationDate: string;
+    excerpt: string;
+    authorPrincipal?: Principal;
+}
 export interface UserProfile {
     bio: string;
     principal: Principal;
@@ -57,32 +74,25 @@ export enum OrgInviteStatus {
     accepted = "accepted",
     declined = "declined"
 }
+export enum SubmissionStatus {
+    pending_review = "pending_review",
+    rejected = "rejected",
+    draft = "draft"
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
     guest = "guest"
 }
-export enum SubmissionStatus {
-    draft = "draft",
-    pending_review = "pending_review",
-    rejected = "rejected"
-}
-export interface ArticleSubmission {
-    articleId: bigint;
-    submissionStatus: SubmissionStatus;
-    rejectionNote?: string;
-    submittedAt?: bigint;
-}
-export interface SubmissionWithArticle {
-    article: Article;
-    submission: ArticleSubmission;
-}
 export interface backendInterface {
+    addComment(articleId: bigint, body: string): Promise<void>;
+    approveArticleSubmission(articleId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     claimSuperAdmin(): Promise<void>;
-    createArticle(title: string, author: string, authorPrincipal: Principal | null, organizationId: bigint | null, publicationDate: string, heroImageBlobId: string | null, heroImageBlobId2: string | null, bodyContent: string, tags: Array<string>): Promise<bigint>;
+    createArticle(title: string, author: string, authorPrincipal: Principal | null, organizationId: bigint | null, publicationDate: string, imageBlobIds: Array<string>, bodyContent: string, tags: Array<string>): Promise<bigint>;
     createOrg(name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<bigint>;
     deleteArticle(articleId: bigint): Promise<void>;
+    deleteComment(commentId: bigint): Promise<void>;
     deleteOrg(orgId: bigint): Promise<void>;
     featureArticle(articleId: bigint): Promise<void>;
     getAllArticles(): Promise<Array<Article>>;
@@ -92,6 +102,7 @@ export interface backendInterface {
     getAuthorArticles(authorPrincipal: Principal): Promise<Array<Article>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getCommentsByArticle(articleId: bigint): Promise<Array<Comment>>;
     getFeaturedArticle(): Promise<Article | null>;
     getMyInvites(): Promise<Array<OrgInvite>>;
     getMyMemberships(): Promise<Array<OrgMembership>>;
@@ -109,15 +120,14 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     isOrgMember(orgId: bigint, user: Principal): Promise<boolean>;
     publishArticle(articleId: bigint): Promise<void>;
+    rejectArticleSubmission(articleId: bigint, note: string | null): Promise<void>;
     removeOrgMember(orgId: bigint, memberPrincipal: Principal): Promise<void>;
     respondToOrgInvite(inviteId: bigint, accept: boolean): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchArticles(queryText: string): Promise<Array<Article>>;
     submitArticleForReview(articleId: bigint): Promise<void>;
-    approveArticleSubmission(articleId: bigint): Promise<void>;
-    rejectArticleSubmission(articleId: bigint, note: string | null): Promise<void>;
     unfeatureArticle(articleId: bigint): Promise<void>;
     unpublishArticle(articleId: bigint): Promise<void>;
-    updateArticle(articleId: bigint, title: string, author: string, organizationId: bigint | null, publicationDate: string, heroImageBlobId: string | null, heroImageBlobId2: string | null, bodyContent: string, tags: Array<string>): Promise<void>;
+    updateArticle(articleId: bigint, title: string, author: string, organizationId: bigint | null, publicationDate: string, imageBlobIds: Array<string>, bodyContent: string, tags: Array<string>): Promise<void>;
     updateOrg(orgId: bigint, name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<void>;
 }

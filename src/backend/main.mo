@@ -1,17 +1,19 @@
 import Map "mo:core/Map";
-import Array "mo:core/Array";
+
 import Order "mo:core/Order";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
-import Iter "mo:core/Iter";
+import Int "mo:core/Int";
 import Nat "mo:core/Nat";
 import List "mo:core/List";
-import Int "mo:core/Int";
 import Runtime "mo:core/Runtime";
+import Iter "mo:core/Iter";
 import Principal "mo:core/Principal";
+import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import MixinStorage "blob-storage/Mixin";
-import AccessControl "authorization/access-control";
+
+
 
 actor {
   type Article = {
@@ -21,8 +23,7 @@ actor {
     authorPrincipal : ?Principal;
     organizationId : ?Nat;
     publicationDate : Text;
-    heroImageBlobId : ?Text;
-    heroImageBlobId2 : ?Text;
+    imageBlobIds : [Text];
     bodyContent : Text;
     excerpt : Text;
     isPublished : Bool;
@@ -76,8 +77,6 @@ actor {
     joinedAt : Int;
   };
 
-  // SubmissionStatus is kept stable (no new variants to avoid migration issues).
-  // "Published" state is derived from article.isPublished on the frontend.
   type SubmissionStatus = {
     #draft;
     #pending_review;
@@ -96,6 +95,21 @@ actor {
     submission : ArticleSubmission;
   };
 
+  type Comment = {
+    id : Nat;
+    articleId : Nat;
+    authorPrincipal : Principal;
+    authorName : Text;
+    body : Text;
+    createdAt : Int;
+  };
+
+  module Comment {
+    public func compare(comment1 : Comment, comment2 : Comment) : Order.Order {
+      Int.compare(comment1.createdAt, comment2.createdAt);
+    };
+  };
+
   // State
   include MixinStorage();
   let accessControlState = AccessControl.initState();
@@ -105,11 +119,11 @@ actor {
   stable var orgIdCounter = 0;
   stable var inviteIdCounter = 0;
 
-  // stable var ensures superAdmin principal survives canister upgrades
+  // stable var ensures superAdmin principal persists across upgrades
   stable var superAdmin : ?Principal = null;
   stable var orgOwners = Map.empty<Nat, Principal>();
 
-  // Storage
+  // Storage persistent vars
   stable var articles = Map.empty<Nat, Article>();
   stable var userProfiles = Map.empty<Principal, UserProfile>();
   stable var organizations = Map.empty<Nat, OrgSection>();
@@ -117,7 +131,87 @@ actor {
   stable var orgMemberships = Map.empty<Text, OrgMembership>();
   stable var articleSubmissions = Map.empty<Nat, ArticleSubmission>();
 
-  // === HELPER FUNCTIONS ===
+  // === NEW COMMENTS LOGIC ===
+  stable var comments = Map.empty<Nat, Comment>();
+  stable var commentIdCounter = 0;
+
+  public shared ({ caller }) func addComment(articleId : Nat, body : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can add comments");
+    };
+
+    switch (articles.get(articleId)) {
+      case (null) { Runtime.trap("Article does not exist") };
+      case (?article) {
+        if (not article.isPublished) {
+          Runtime.trap("Cannot comment on unpublished article");
+        };
+      };
+    };
+
+    let authorName = switch (userProfiles.get(caller)) {
+      case (?profile) { profile.name };
+      case (null) { "Anonymous" };
+    };
+
+    let comment : Comment = {
+      id = commentIdCounter;
+      articleId;
+      authorPrincipal = caller;
+      authorName;
+      body;
+      createdAt = Time.now();
+    };
+
+    comments.add(commentIdCounter, comment);
+    commentIdCounter += 1;
+  };
+
+  public query func getCommentsByArticle(articleId : Nat) : async [Comment] {
+    comments.values()
+      .filter(func(c) { c.articleId == articleId })
+      .toArray()
+      .sort();
+  };
+
+  public shared ({ caller }) func deleteComment(commentId : Nat) : async () {
+    switch (comments.get(commentId)) {
+      case (null) { Runtime.trap("Comment does not exist") };
+      case (?comment) {
+        // Author can always delete
+        if (comment.authorPrincipal == caller) {
+          comments.remove(commentId);
+          return;
+        };
+
+        // SuperAdmin can always delete
+        if (isSuperAdmin(caller)) {
+          comments.remove(commentId);
+          return;
+        };
+
+        // Organization admins can delete any comment on their article
+        switch (articles.get(comment.articleId)) {
+          case (?article) {
+            switch (article.organizationId) {
+              case (?orgId) {
+                validateSuperAdminOrOrgOwner(caller, orgId);
+                comments.remove(commentId);
+              };
+              case (null) {
+                Runtime.trap("Unauthorized: Only the comment author or super admin can perform this action");
+              };
+            };
+          };
+          case (null) {
+            Runtime.trap("Associated article not found");
+          };
+        };
+      };
+    };
+  };
+
+  // === EXISTING LOGIC BELOW ===
 
   func isSuperAdmin(caller : Principal) : Bool {
     switch (superAdmin) {
@@ -154,8 +248,6 @@ actor {
     orgMemberships.get(key) != null;
   };
 
-  // Strip HTML tags from a string and return plain text truncated to maxLen chars.
-  // Used to generate clean excerpts from rich-text HTML body content.
   func extractPlainTextExcerpt(html : Text, maxLen : Nat) : Text {
     var plain = "";
     var inTag = false;
@@ -191,7 +283,6 @@ actor {
     switch (superAdmin) {
       case (null) {
         superAdmin := ?caller;
-        // Directly assign #admin role; bypassing token comparison that would incorrectly register as #user
         accessControlState.userRoles.add(caller, #admin);
         accessControlState.adminAssigned := true;
       };
@@ -212,9 +303,6 @@ actor {
       case (null) { Runtime.trap("Organization does not exist: " # orgId.toText()) };
       case (?_) {};
     };
-
-    // Bug fix: removed user profile existence check so admins can invite
-    // any valid principal, even before the user has logged in.
 
     let membershipKey = orgId.toText() # "_" # userPrincipal.toText();
     switch (orgMemberships.get(membershipKey)) {
@@ -275,7 +363,7 @@ actor {
     };
 
     let invites = orgInvites.values().filter(
-     func(invite) { invite.invitedPrincipal == caller and invite.status == #pending }
+      func(invite) { invite.invitedPrincipal == caller and invite.status == #pending }
     );
     invites.toArray();
   };
@@ -405,8 +493,7 @@ actor {
     authorPrincipal : ?Principal,
     organizationId : ?Nat,
     publicationDate : Text,
-    heroImageBlobId : ?Text,
-    heroImageBlobId2 : ?Text,
+    imageBlobIds : [Text],
     bodyContent : Text,
     tags : [Text],
   ) : async Nat {
@@ -434,8 +521,7 @@ actor {
       authorPrincipal;
       organizationId;
       publicationDate;
-      heroImageBlobId;
-      heroImageBlobId2;
+      imageBlobIds;
       bodyContent;
       excerpt;
       isPublished = false;
@@ -472,8 +558,7 @@ actor {
     author : Text,
     organizationId : ?Nat,
     publicationDate : Text,
-    heroImageBlobId : ?Text,
-    heroImageBlobId2 : ?Text,
+    imageBlobIds : [Text],
     bodyContent : Text,
     tags : [Text],
   ) : async () {
@@ -507,8 +592,7 @@ actor {
           authorPrincipal = existingArticle.authorPrincipal;
           organizationId;
           publicationDate;
-          heroImageBlobId;
-          heroImageBlobId2;
+          imageBlobIds;
           bodyContent;
           excerpt;
           isPublished = existingArticle.isPublished;
@@ -521,11 +605,9 @@ actor {
 
         switch (articleSubmissions.get(articleId)) {
           case (?sub) {
-            // Bug fix: if org changed, remove the orphaned submission
             if (existingArticle.organizationId != organizationId) {
               articleSubmissions.remove(articleId);
             } else if (sub.submissionStatus == #rejected) {
-              // Reset rejected submission to draft after author edits
               let resetSub = { sub with submissionStatus = #draft; rejectionNote = null };
               articleSubmissions.add(articleId, resetSub);
             };
@@ -564,11 +646,9 @@ actor {
           case (?ap) { ap == caller };
           case (null) { false };
         };
-
         if (not isAuthor and not isSuperAdmin(caller)) {
           Runtime.trap("Unauthorized: Only the original author or super admin can unpublish an article");
         };
-
         let updatedArticle = { existingArticle with isPublished = false };
         articles.add(articleId, updatedArticle);
       };
@@ -617,13 +697,7 @@ actor {
             };
           };
         };
-
-        for ((id, article) in articles.entries()) {
-          if (article.isFeatured) {
-            articles.add(id, { article with isFeatured = false });
-          };
-        };
-
+        // Allow multiple featured articles -- each is a pin that floats to the top
         let updatedArticle = { existingArticle with isFeatured = true };
         articles.add(articleId, updatedArticle);
       };
@@ -644,7 +718,6 @@ actor {
             };
           };
         };
-
         let updatedArticle = { existingArticle with isFeatured = false };
         articles.add(articleId, updatedArticle);
       };
@@ -667,7 +740,6 @@ actor {
             Runtime.trap("Unauthorized: Article has no author assigned");
           };
         };
-
         switch (articleSubmissions.get(articleId)) {
           case (null) { Runtime.trap("Article is not a contributor submission") };
           case (?sub) {
@@ -682,9 +754,6 @@ actor {
     };
   };
 
-  // Bug fix: validate pending_review status before approving;
-  // keep the submission entry so contributors can see their approved work
-  // (frontend derives "published" state from article.isPublished)
   public shared ({ caller }) func approveArticleSubmission(articleId : Nat) : async () {
     switch (articles.get(articleId)) {
       case (null) { Runtime.trap("Article not found") };
@@ -697,17 +766,14 @@ actor {
             Runtime.trap("Article does not belong to an organization");
           };
         };
-
         switch (articleSubmissions.get(articleId)) {
           case (null) { Runtime.trap("Article is not a contributor submission") };
           case (?sub) {
             if (sub.submissionStatus != #pending_review) {
               Runtime.trap("Cannot approve: article must be in pending review status");
             };
-            // Publish the article; keep submission entry so contributor sees it
             let published = { article with isPublished = true };
             articles.add(articleId, published);
-            // Submission entry stays — frontend uses article.isPublished to show "Published" badge
           };
         };
       };
@@ -726,7 +792,6 @@ actor {
             Runtime.trap("Article does not belong to an organization");
           };
         };
-
         switch (articleSubmissions.get(articleId)) {
           case (null) { Runtime.trap("Article is not a contributor submission") };
           case (?sub) {
@@ -761,7 +826,6 @@ actor {
     result.toArray();
   };
 
-  // Bug fix: exclude already-published articles from the pending queue
   public query ({ caller }) func getPendingSubmissions(orgId : Nat) : async [SubmissionWithArticle] {
     validateSuperAdminOrOrgOwner(caller, orgId);
 
@@ -770,7 +834,6 @@ actor {
       if (sub.submissionStatus == #pending_review) {
         switch (articles.get(articleId)) {
           case (?article) {
-            // Only show articles that are still unpublished (not yet approved)
             if (article.organizationId == ?orgId and not article.isPublished) {
               result.add({ article; submission = sub });
             };
@@ -793,7 +856,6 @@ actor {
       return articles.values().toArray().sort();
     };
 
-    // Bug fix: regular admins see their org articles AND their own no-org articles
     let ownedOrgIds = getOwnedOrgIds(caller);
     let myArticles = List.empty<Article>();
     for (article in articles.values()) {
@@ -826,9 +888,15 @@ actor {
   // === PUBLIC QUERIES ===
 
   public query func getPublishedArticles() : async [Article] {
-    articles.values().filter(
+    let published = articles.values().filter(
       func(article) { article.isPublished }
-    ).toArray().sort();
+    ).toArray();
+    // Featured articles pin to the top, newest-first among featured, then non-featured newest-first
+    published.sort(func(a : Article, b : Article) : Order.Order {
+      if (a.isFeatured and not b.isFeatured) { return #less };
+      if (not a.isFeatured and b.isFeatured) { return #greater };
+      Int.compare(b.createdAt, a.createdAt);
+    });
   };
 
   public query func getFeaturedArticle() : async ?Article {
@@ -875,7 +943,6 @@ actor {
     organizations.values().toArray();
   };
 
-  // Bug fix: return ?OrgSection so the frontend can handle missing orgs gracefully
   public query func getOrgById(orgId : Nat) : async ?OrgSection {
     organizations.get(orgId);
   };

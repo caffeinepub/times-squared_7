@@ -11,6 +11,7 @@ import LoginPage from "./pages/LoginPage";
 import OrgPage from "./pages/OrgPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import SectionPage from "./pages/SectionPage";
+import SupportPage from "./pages/SupportPage";
 import TeamPage from "./pages/TeamPage";
 import WhitepaperPage from "./pages/WhitepaperPage";
 
@@ -20,6 +21,7 @@ function parseRoute(pathname: string) {
   if (pathname === "/login") return { page: "login" };
   if (pathname === "/team") return { page: "team" };
   if (pathname === "/whitepaper") return { page: "whitepaper" };
+  if (pathname === "/support") return { page: "support" };
 
   const articleMatch = pathname.match(/^\/article\/(.+)$/);
   if (articleMatch) return { page: "article", param: articleMatch[1] };
@@ -77,6 +79,8 @@ export default function App() {
         return <TeamPage />;
       case "whitepaper":
         return <WhitepaperPage />;
+      case "support":
+        return <SupportPage />;
       case "login":
         return <LoginPage />;
       default:

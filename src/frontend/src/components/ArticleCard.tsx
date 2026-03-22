@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { Article, OrgSection } from "../backend.d";
 import { getExcerpt } from "../lib/excerpt";
 import { formatDate, navigate } from "../lib/navigate";
+import { getReadTime } from "../lib/readTime";
+import ImageCarousel from "./ImageCarousel";
 
 interface ArticleCardProps {
   article: Article;
@@ -35,16 +37,48 @@ export default function ArticleCard({
     navigate(`/article/${article.id}`);
   };
 
+  const hasImages = article.imageBlobIds.length > 0;
+  const readTime = getReadTime(article.bodyContent ?? "");
+
   return (
     <motion.article
       data-ocid={`article.item.${index + 1}`}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.08 }}
-      className="border-t border-white/20 pt-6 pb-6 cursor-pointer group"
+      className="border-t border-white/20 pt-6 pb-6 cursor-pointer group transition-all duration-200"
       onClick={handleCardClick}
     >
       <div className="flex flex-col gap-3">
+        {/* Image / Carousel */}
+        {hasImages && (
+          <div
+            className="relative -mx-0 overflow-hidden"
+            style={{ height: "200px" }}
+          >
+            <ImageCarousel
+              blobIds={article.imageBlobIds}
+              className="w-full h-full object-cover"
+              style={{ height: "200px" }}
+              onClick={handleCardClick}
+            />
+            {/* ICP domain overlay — Guardian style */}
+            <div className="absolute bottom-2 left-2 pointer-events-none">
+              <span
+                className="text-white/70 font-sans"
+                style={{
+                  fontSize: "10px",
+                  background: "rgba(0,0,0,0.55)",
+                  padding: "2px 6px",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {window.location.hostname}
+              </span>
+            </div>
+          </div>
+        )}
+
         <h3 className="font-editorial text-xl leading-tight text-white group-hover:text-white/80 transition-colors line-clamp-2">
           {article.title}
         </h3>
@@ -82,6 +116,8 @@ export default function ArticleCard({
               </button>
             </>
           )}
+          <span className="text-white/20">·</span>
+          <span>{readTime}</span>
         </div>
         <p className="text-white/60 text-sm leading-relaxed line-clamp-2 font-sans">
           {getExcerpt(article)}

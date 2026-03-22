@@ -2,6 +2,7 @@ import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Article,
+  Comment,
   OrgInvite,
   OrgMembership,
   OrgSection,
@@ -248,8 +249,7 @@ export function useCreateArticle() {
       authorPrincipal: Principal | null;
       organizationId: bigint | null;
       publicationDate: string;
-      heroImageBlobId: string | null;
-      heroImageBlobId2: string | null;
+      imageBlobIds: string[];
       bodyContent: string;
       tags: string[];
     }) => {
@@ -260,8 +260,7 @@ export function useCreateArticle() {
         args.authorPrincipal,
         args.organizationId,
         args.publicationDate,
-        args.heroImageBlobId,
-        args.heroImageBlobId2,
+        args.imageBlobIds,
         args.bodyContent,
         args.tags,
       );
@@ -285,8 +284,7 @@ export function useUpdateArticle() {
       author: string;
       organizationId: bigint | null;
       publicationDate: string;
-      heroImageBlobId: string | null;
-      heroImageBlobId2: string | null;
+      imageBlobIds: string[];
       bodyContent: string;
       tags: string[];
     }) => {
@@ -297,8 +295,7 @@ export function useUpdateArticle() {
         args.author,
         args.organizationId,
         args.publicationDate,
-        args.heroImageBlobId,
-        args.heroImageBlobId2,
+        args.imageBlobIds,
         args.bodyContent,
         args.tags,
       );
@@ -639,6 +636,50 @@ export function useRejectArticleSubmission() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pendingSubmissions"] });
+    },
+  });
+}
+
+// ─── Comment Queries ──────────────────────────────────────────────────────────
+
+export function useGetCommentsByArticle(articleId: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Comment[]>({
+    queryKey: ["comments", articleId?.toString()],
+    queryFn: async () => {
+      if (!actor || articleId === null) return [];
+      return actor.getCommentsByArticle(articleId);
+    },
+    enabled: !!actor && !isFetching && articleId !== null,
+  });
+}
+
+export function useAddComment() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { articleId: bigint; body: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.addComment(args.articleId, args.body);
+    },
+    onSuccess: (_data, args) => {
+      queryClient.invalidateQueries({
+        queryKey: ["comments", args.articleId.toString()],
+      });
+    },
+  });
+}
+
+export function useDeleteComment() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (commentId: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.deleteComment(commentId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["comments"] });
     },
   });
 }

@@ -91,6 +91,7 @@ export default function NavDrawer({
     { label: "Team", path: "/team", ocid: "nav.team.link" },
     { label: "Whitepaper", path: "/whitepaper", ocid: "nav.whitepaper.link" },
     { label: "Privacy", path: "/privacy", ocid: "nav.privacy.link" },
+    { label: "Support", path: "/support", ocid: "nav.support.link" },
   ];
 
   const isAdminView = activePanel !== null;

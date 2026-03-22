@@ -8,10 +8,11 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { Principal } from "@icp-sdk/core/principal";
-import { Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, X } from "lucide-react";
 import { Component, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
+import { ExternalBlob } from "../../backend";
 import type { Article } from "../../backend.d";
 import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import {
@@ -24,11 +25,9 @@ import {
 } from "../../hooks/useQueries";
 import { uploadFileToBlobStorage } from "../../hooks/useUploadFile";
 
-// Sentinel value used in place of empty string for Radix Select.
-// Radix UI requires all SelectItem values to be non-empty strings.
 const NO_ORG = "__none__";
+const MAX_IMAGES = 10;
 
-// Error boundary so any crash shows a visible message instead of a blank screen.
 class FormErrorBoundary extends Component<
   { children: ReactNode },
   { error: string | null }
@@ -68,8 +67,21 @@ class FormErrorBoundary extends Component<
 interface ArticleFormPanelProps {
   article?: Article | null;
   onBack: () => void;
-  /** In contributor mode, only show orgs the contributor is a member of and hide publish toggle */
   isContributorMode?: boolean;
+}
+
+function BlobThumb({ blobId }: { blobId: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const blob = ExternalBlob.fromURL(blobId);
+      setUrl(blob.getDirectURL());
+    } catch {
+      // ignore
+    }
+  }, [blobId]);
+  if (!url) return <div className="w-full h-full bg-white/10" />;
+  return <img src={url} alt="" className="w-full h-full object-cover" />;
 }
 
 function ArticleFormInner({
@@ -94,7 +106,6 @@ function ArticleFormInner({
   const [authorPrincipal, setAuthorPrincipal] = useState(
     article?.authorPrincipal?.toString() ?? "",
   );
-  // Use NO_ORG sentinel instead of empty string to satisfy Radix Select constraint.
   const [orgId, setOrgId] = useState<string>(
     article?.organizationId?.toString() ?? NO_ORG,
   );
@@ -104,12 +115,11 @@ function ArticleFormInner({
       : new Date().toISOString().slice(0, 10),
   );
   const [tags, setTags] = useState(article?.tags.join(", ") ?? "");
-  const [heroId, setHeroId] = useState<string | null>(
-    article?.heroImageBlobId ?? null,
+  const [imageBlobIds, setImageBlobIds] = useState<string[]>(
+    article?.imageBlobIds ?? [],
   );
-  const heroId2 = article?.heroImageBlobId2 ?? null;
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const [isPublished, setIsPublished] = useState(article?.isPublished ?? false);
-  const [uploadingHero, setUploadingHero] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -129,23 +139,45 @@ function ArticleFormInner({
     }
   }, [isContributorMode, availableOrgs, orgId]);
 
-  const handleHeroUpload = useCallback(
+  const handleImageUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploadingHero(true);
+      const files = Array.from(e.target.files ?? []);
+      if (!files.length) return;
+      const remaining = MAX_IMAGES - imageBlobIds.length;
+      const toUpload = files.slice(0, remaining);
+      setUploadingIndex(imageBlobIds.length);
       try {
-        const url = await uploadFileToBlobStorage(file);
-        setHeroId(url);
-        toast.success("Hero image uploaded");
+        const ids = await Promise.all(
+          toUpload.map((f) => uploadFileToBlobStorage(f)),
+        );
+        setImageBlobIds((prev) => [...prev, ...ids]);
+        toast.success(
+          ids.length === 1 ? "Image uploaded" : `${ids.length} images uploaded`,
+        );
       } catch {
         toast.error("Upload failed");
       } finally {
-        setUploadingHero(false);
+        setUploadingIndex(null);
+        // reset input so same file can be re-uploaded
+        e.target.value = "";
       }
     },
-    [],
+    [imageBlobIds.length],
   );
+
+  const removeImage = (i: number) => {
+    setImageBlobIds((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const moveImage = (i: number, dir: -1 | 1) => {
+    const next = i + dir;
+    if (next < 0 || next >= imageBlobIds.length) return;
+    setImageBlobIds((prev) => {
+      const arr = [...prev];
+      [arr[i], arr[next]] = [arr[next], arr[i]];
+      return arr;
+    });
+  };
 
   const execCmd = (cmd: string, value?: string) => {
     editorRef.current?.focus();
@@ -158,7 +190,6 @@ function ArticleFormInner({
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
-    // Treat sentinel as "no org selected"
     const parsedOrgId = orgId && orgId !== NO_ORG ? BigInt(orgId) : null;
     const parsedPubDate = pubDate
       ? `${pubDate}T00:00:00Z`
@@ -185,8 +216,7 @@ function ArticleFormInner({
           author,
           organizationId: parsedOrgId,
           publicationDate: parsedPubDate,
-          heroImageBlobId: heroId,
-          heroImageBlobId2: heroId2,
+          imageBlobIds,
           bodyContent,
           tags: parsedTags,
         });
@@ -204,8 +234,7 @@ function ArticleFormInner({
           authorPrincipal: principalArg,
           organizationId: parsedOrgId,
           publicationDate: parsedPubDate,
-          heroImageBlobId: heroId,
-          heroImageBlobId2: heroId2,
+          imageBlobIds,
           bodyContent,
           tags: parsedTags,
         });
@@ -344,30 +373,88 @@ function ArticleFormInner({
         />
       </div>
 
-      {/* Hero Image */}
-      <div className="space-y-1">
+      {/* Images */}
+      <div className="space-y-2">
         <Label className="text-white/40 text-[10px] uppercase tracking-widest font-sans">
-          Hero Image
+          Images ({imageBlobIds.length}/{MAX_IMAGES})
         </Label>
-        <label
-          data-ocid="admin.article_form.upload_button"
-          className="flex items-center gap-2 border border-dashed border-white/20 px-3 py-2 text-white/40 text-xs font-sans cursor-pointer hover:border-white/40 transition-colors"
-        >
-          {uploadingHero ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : null}
-          {heroId ? "Replace hero image" : "Upload hero image"}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleHeroUpload}
-          />
-        </label>
-        {heroId && (
-          <p className="text-white/30 text-[10px] font-sans truncate">
-            {heroId}
-          </p>
+
+        {/* Thumbnail grid */}
+        {imageBlobIds.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {imageBlobIds.map((id, i) => (
+              <div
+                key={id}
+                className="flex items-center gap-2 border border-white/10 p-1.5"
+              >
+                <div className="w-14 h-10 flex-shrink-0 overflow-hidden">
+                  <BlobThumb blobId={id} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/40 text-[10px] font-sans uppercase tracking-wider truncate">
+                    {i === 0 ? "Cover Image" : `Image ${i + 1}`}
+                  </p>
+                  <p className="text-white/20 text-[9px] font-mono truncate">
+                    {id}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => moveImage(i, -1)}
+                    disabled={i === 0}
+                    aria-label="Move up"
+                    className="p-1 text-white/30 hover:text-white/70 disabled:opacity-20 transition-colors"
+                  >
+                    <ArrowUp size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveImage(i, 1)}
+                    disabled={i === imageBlobIds.length - 1}
+                    aria-label="Move down"
+                    className="p-1 text-white/30 hover:text-white/70 disabled:opacity-20 transition-colors"
+                  >
+                    <ArrowDown size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    data-ocid="admin.article_form.delete_button"
+                    onClick={() => removeImage(i)}
+                    aria-label="Remove image"
+                    className="p-1 text-white/30 hover:text-red-400 transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Upload button */}
+        {imageBlobIds.length < MAX_IMAGES && (
+          <label
+            data-ocid="admin.article_form.upload_button"
+            className="flex items-center gap-2 border border-dashed border-white/20 px-3 py-2 text-white/40 text-xs font-sans cursor-pointer hover:border-white/40 transition-colors"
+          >
+            {uploadingIndex !== null ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : null}
+            {uploadingIndex !== null
+              ? "Uploading..."
+              : imageBlobIds.length === 0
+                ? "Upload images (first = cover)"
+                : "Add more images"}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleImageUpload}
+              disabled={uploadingIndex !== null}
+            />
+          </label>
         )}
       </div>
 

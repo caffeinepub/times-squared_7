@@ -16,8 +16,12 @@ function HeroImage({ blobId }: { blobId: string }) {
   const [url, setUrl] = useState<string | null>(null);
 
   useState(() => {
-    const blob = ExternalBlob.fromURL(blobId);
-    setUrl(blob.getDirectURL());
+    try {
+      const blob = ExternalBlob.fromURL(blobId);
+      setUrl(blob.getDirectURL());
+    } catch {
+      // ignore
+    }
   });
 
   if (!url) {
@@ -55,7 +59,7 @@ export default function HomePage() {
     featured ?? (published.length > 0 ? published[0] : null);
   const otherArticles = published.filter((a) => a.id !== featuredArticle?.id);
 
-  const heroImageBlobId = featuredArticle?.heroImageBlobId ?? null;
+  const coverImageBlobId = featuredArticle?.imageBlobIds[0] ?? null;
 
   const handleCopyFeatured = async () => {
     if (!featuredArticle) return;
@@ -76,8 +80,8 @@ export default function HomePage() {
     >
       {/* Hero */}
       <div className="relative overflow-hidden">
-        {heroImageBlobId ? (
-          <HeroImage blobId={heroImageBlobId} />
+        {coverImageBlobId ? (
+          <HeroImage blobId={coverImageBlobId} />
         ) : (
           <div
             className="w-full relative"

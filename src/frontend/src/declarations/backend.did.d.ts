@@ -16,15 +16,28 @@ export interface Article {
   'bodyContent' : string,
   'title' : string,
   'isPublished' : boolean,
+  'imageBlobIds' : Array<string>,
   'createdAt' : bigint,
   'tags' : Array<string>,
   'author' : string,
   'isFeatured' : boolean,
   'publicationDate' : string,
-  'heroImageBlobId2' : [] | [string],
   'excerpt' : string,
-  'heroImageBlobId' : [] | [string],
   'authorPrincipal' : [] | [Principal],
+}
+export interface ArticleSubmission {
+  'submittedAt' : [] | [bigint],
+  'submissionStatus' : SubmissionStatus,
+  'articleId' : bigint,
+  'rejectionNote' : [] | [string],
+}
+export interface Comment {
+  'id' : bigint,
+  'body' : string,
+  'createdAt' : bigint,
+  'authorName' : string,
+  'articleId' : bigint,
+  'authorPrincipal' : Principal,
 }
 export interface OrgInvite {
   'status' : OrgInviteStatus,
@@ -50,6 +63,13 @@ export interface OrgSection {
   'slug' : string,
   'description' : string,
   'logoBlobId' : [] | [string],
+}
+export type SubmissionStatus = { 'pending_review' : null } |
+  { 'rejected' : null } |
+  { 'draft' : null };
+export interface SubmissionWithArticle {
+  'article' : Article,
+  'submission' : ArticleSubmission,
 }
 export interface UserProfile {
   'bio' : string,
@@ -89,6 +109,8 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addComment' : ActorMethod<[bigint, string], undefined>,
+  'approveArticleSubmission' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'claimSuperAdmin' : ActorMethod<[], undefined>,
   'createArticle' : ActorMethod<
@@ -98,8 +120,7 @@ export interface _SERVICE {
       [] | [Principal],
       [] | [bigint],
       string,
-      [] | [string],
-      [] | [string],
+      Array<string>,
       string,
       Array<string>,
     ],
@@ -110,6 +131,7 @@ export interface _SERVICE {
     bigint
   >,
   'deleteArticle' : ActorMethod<[bigint], undefined>,
+  'deleteComment' : ActorMethod<[bigint], undefined>,
   'deleteOrg' : ActorMethod<[bigint], undefined>,
   'featureArticle' : ActorMethod<[bigint], undefined>,
   'getAllArticles' : ActorMethod<[], Array<Article>>,
@@ -119,14 +141,17 @@ export interface _SERVICE {
   'getAuthorArticles' : ActorMethod<[Principal], Array<Article>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getCommentsByArticle' : ActorMethod<[bigint], Array<Comment>>,
   'getFeaturedArticle' : ActorMethod<[], [] | [Article]>,
   'getMyInvites' : ActorMethod<[], Array<OrgInvite>>,
   'getMyMemberships' : ActorMethod<[], Array<OrgMembership>>,
   'getMyOrgs' : ActorMethod<[], Array<OrgSection>>,
+  'getMySubmissions' : ActorMethod<[], Array<SubmissionWithArticle>>,
   'getOrgArticles' : ActorMethod<[bigint], Array<Article>>,
   'getOrgById' : ActorMethod<[bigint], [] | [OrgSection]>,
   'getOrgMembers' : ActorMethod<[bigint], Array<OrgMembership>>,
   'getOrgs' : ActorMethod<[], Array<OrgSection>>,
+  'getPendingSubmissions' : ActorMethod<[bigint], Array<SubmissionWithArticle>>,
   'getPublishedArticles' : ActorMethod<[], Array<Article>>,
   'getSuperAdmin' : ActorMethod<[], [] | [Principal]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
@@ -134,10 +159,12 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isOrgMember' : ActorMethod<[bigint, Principal], boolean>,
   'publishArticle' : ActorMethod<[bigint], undefined>,
+  'rejectArticleSubmission' : ActorMethod<[bigint, [] | [string]], undefined>,
   'removeOrgMember' : ActorMethod<[bigint, Principal], undefined>,
   'respondToOrgInvite' : ActorMethod<[bigint, boolean], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchArticles' : ActorMethod<[string], Array<Article>>,
+  'submitArticleForReview' : ActorMethod<[bigint], undefined>,
   'unfeatureArticle' : ActorMethod<[bigint], undefined>,
   'unpublishArticle' : ActorMethod<[bigint], undefined>,
   'updateArticle' : ActorMethod<
@@ -147,8 +174,7 @@ export interface _SERVICE {
       string,
       [] | [bigint],
       string,
-      [] | [string],
-      [] | [string],
+      Array<string>,
       string,
       Array<string>,
     ],
