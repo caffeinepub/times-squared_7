@@ -8,6 +8,52 @@ import { useGetOrgs, useGetPublishedArticles } from "../hooks/useQueries";
 import { getExcerpt } from "../lib/excerpt";
 import { formatDate, navigate } from "../lib/navigate";
 
+// 5×5 crossword pattern with stable precomputed ids
+const CROSSWORD_ICON_PATTERN = [
+  { id: "i00", black: false },
+  { id: "i01", black: false },
+  { id: "i02", black: true },
+  { id: "i03", black: false },
+  { id: "i04", black: false },
+  { id: "i10", black: false },
+  { id: "i11", black: true },
+  { id: "i12", black: false },
+  { id: "i13", black: true },
+  { id: "i14", black: false },
+  { id: "i20", black: false },
+  { id: "i21", black: false },
+  { id: "i22", black: false },
+  { id: "i23", black: false },
+  { id: "i24", black: false },
+  { id: "i30", black: false },
+  { id: "i31", black: true },
+  { id: "i32", black: false },
+  { id: "i33", black: true },
+  { id: "i34", black: false },
+  { id: "i40", black: false },
+  { id: "i41", black: false },
+  { id: "i42", black: true },
+  { id: "i43", black: false },
+  { id: "i44", black: false },
+];
+
+function CrosswordIcon() {
+  return (
+    <div
+      className="inline-grid gap-px"
+      style={{ gridTemplateColumns: "repeat(5, 12px)" }}
+    >
+      {CROSSWORD_ICON_PATTERN.map(({ id, black }) => (
+        <div
+          key={id}
+          className={black ? "bg-white/40" : "border border-white/30 bg-black"}
+          style={{ width: 12, height: 12 }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function HeroImage({ blobId }: { blobId: string }) {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -199,6 +245,28 @@ export default function HomePage() {
             </section>
           </>
         )}
+      </div>
+
+      {/* Crossword game icon — bottom of homepage */}
+      <div className="border-t border-white/10 mt-4 py-10">
+        <div className="flex flex-col items-center">
+          <motion.button
+            type="button"
+            data-ocid="home.games.link"
+            onClick={() => navigate("/games")}
+            whileHover={{ opacity: 0.7 }}
+            transition={{ duration: 0.15 }}
+            className="flex flex-col items-center gap-3 group"
+          >
+            <CrosswordIcon />
+            <span className="text-white/60 text-xs font-sans uppercase tracking-widest group-hover:text-white/80 transition-colors">
+              The Crossword
+            </span>
+            <span className="text-white/25 text-[10px] font-sans uppercase tracking-widest">
+              Times² Games
+            </span>
+          </motion.button>
+        </div>
       </div>
     </motion.main>
   );

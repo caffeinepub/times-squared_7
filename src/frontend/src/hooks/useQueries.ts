@@ -10,11 +10,11 @@ import type {
   OrgMembership,
   OrgSection,
   Puzzle,
-  PuzzleType,
   SubmissionWithArticle,
   UserProfile,
   UserRole,
 } from "../backend.d";
+import { PuzzleType } from "../backend.d";
 import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
 
@@ -776,6 +776,28 @@ export function useSetActivePuzzle() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allPuzzles"] });
+      queryClient.invalidateQueries({ queryKey: ["activePuzzles"] });
     },
+  });
+}
+
+export function useGetActivePuzzles() {
+  const { actor, isFetching } = useActor();
+  return useQuery<{ mini: Puzzle | null; standard: Puzzle | null }>({
+    queryKey: ["activePuzzles"],
+    queryFn: async () => {
+      if (!actor) return { mini: null, standard: null };
+      const all = await puzzleActor(actor).getAllPuzzles();
+      const mini =
+        all.find(
+          (p: Puzzle) => p.puzzleType === PuzzleType.mini && p.isActive,
+        ) ?? null;
+      const standard =
+        all.find(
+          (p: Puzzle) => p.puzzleType === PuzzleType.standard && p.isActive,
+        ) ?? null;
+      return { mini, standard };
+    },
+    enabled: !!actor && !isFetching,
   });
 }

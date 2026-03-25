@@ -6,6 +6,7 @@ import { loadConfig } from "./config";
 import { useSuperAdminClaim } from "./hooks/useSuperAdminClaim";
 import ArticlePage from "./pages/ArticlePage";
 import AuthorPage from "./pages/AuthorPage";
+import GamesPage from "./pages/GamesPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import OrgPage from "./pages/OrgPage";
@@ -22,6 +23,7 @@ function parseRoute(pathname: string) {
   if (pathname === "/team") return { page: "team" };
   if (pathname === "/whitepaper") return { page: "whitepaper" };
   if (pathname === "/support") return { page: "support" };
+  if (pathname === "/games") return { page: "games" };
 
   const articleMatch = pathname.match(/^\/article\/(.+)$/);
   if (articleMatch) return { page: "article", param: articleMatch[1] };
@@ -81,6 +83,8 @@ export default function App() {
         return <WhitepaperPage />;
       case "support":
         return <SupportPage />;
+      case "games":
+        return <GamesPage />;
       case "login":
         return <LoginPage />;
       default:

@@ -191,7 +191,7 @@ actor {
     cells : [CrosswordCell],
     clues : [CrosswordClue],
   ) : async Nat {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can create puzzles");
     };
 
@@ -222,7 +222,7 @@ actor {
     cells : [CrosswordCell],
     clues : [CrosswordClue],
   ) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can update puzzles");
     };
 
@@ -243,7 +243,7 @@ actor {
   };
 
   public shared ({ caller }) func deletePuzzle(id : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can delete puzzles");
     };
 
@@ -255,7 +255,7 @@ actor {
 
   // Activate a puzzle. Deactivates all other puzzles of the same type.
   public shared ({ caller }) func setActivePuzzle(id : Nat) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can activate puzzles");
     };
 
@@ -292,7 +292,7 @@ actor {
   };
 
   public query ({ caller }) func getAllPuzzles() : async [Puzzle] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can view all puzzles");
     };
     puzzles.values().toArray().sort();
@@ -382,6 +382,15 @@ actor {
     switch (superAdmin) {
       case (?admin) { admin == caller };
       case (null) { false };
+    };
+  };
+
+  // Safe check for admin or super admin -- avoids trap when user not registered
+  func isAdminOrSuperAdmin(caller : Principal) : Bool {
+    if (isSuperAdmin(caller)) { return true };
+    switch (accessControlState.userRoles.get(caller)) {
+      case (?#admin) { true };
+      case (_) { false };
     };
   };
 
