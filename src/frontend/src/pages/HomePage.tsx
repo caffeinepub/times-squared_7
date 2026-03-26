@@ -1,6 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ExternalBlob } from "../backend";
 import ArticleCard from "../components/ArticleCard";
 import ArticleCardSkeleton from "../components/ArticleCardSkeleton";
@@ -57,14 +57,14 @@ function CrosswordIcon() {
 function HeroImage({ blobId }: { blobId: string }) {
   const [url, setUrl] = useState<string | null>(null);
 
-  useState(() => {
+  useEffect(() => {
     try {
       const blob = ExternalBlob.fromURL(blobId);
       setUrl(blob.getDirectURL());
     } catch {
       // ignore
     }
-  });
+  }, [blobId]);
 
   if (!url) {
     return (

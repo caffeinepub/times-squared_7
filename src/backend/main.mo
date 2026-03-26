@@ -163,7 +163,7 @@ actor {
   stable var inviteIdCounter = 0;
 
   // stable var ensures superAdmin principal persists across upgrades
-  stable var superAdmin : ?Principal = null;
+  stable var superAdmin : ?Principal = ?Principal.fromText("nvjwr-ru5jj-szayf-tdyeh-4aeph-cfp5n-upac4-7sx3f-osptw-jk3rq-yqe");
   var orgOwners = Map.empty<Nat, Principal>();
 
   // Storage persistent vars (Maps are implicitly stable)
@@ -459,7 +459,15 @@ actor {
         accessControlState.userRoles.add(caller, #admin);
         accessControlState.adminAssigned := true;
       };
-      case (_) { Runtime.trap("Super admin already claimed") };
+      case (?existingAdmin) {
+        // Allow the pre-set super admin to register their role on a fresh canister
+        if (caller == existingAdmin) {
+          accessControlState.userRoles.add(caller, #admin);
+          accessControlState.adminAssigned := true;
+        } else {
+          Runtime.trap("Super admin already claimed");
+        };
+      };
     };
   };
 
@@ -586,7 +594,7 @@ actor {
     logoBlobId : ?Text,
     bannerBlobId : ?Text,
   ) : async Nat {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can create organizations");
     };
 
@@ -639,7 +647,7 @@ actor {
   };
 
   public query ({ caller }) func getMyOrgs() : async [OrgSection] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can view their organizations");
     };
 
@@ -679,7 +687,7 @@ actor {
         };
       };
       case (null) {
-        if (not (AccessControl.isAdmin(accessControlState, caller))) {
+        if (not isAdminOrSuperAdmin(caller)) {
           Runtime.trap("Unauthorized: Only admins can create articles");
         };
       };
@@ -749,7 +757,7 @@ actor {
               validateSuperAdminOrOrgOwner(caller, orgId);
             };
             case (null) {
-              if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              if (not isAdminOrSuperAdmin(caller)) {
                 Runtime.trap("Unauthorized: Only admins can update this article");
               };
             };
@@ -800,7 +808,7 @@ actor {
             validateSuperAdminOrOrgOwner(caller, orgId);
           };
           case (null) {
-            if (not (AccessControl.isAdmin(accessControlState, caller))) {
+            if (not isAdminOrSuperAdmin(caller)) {
               Runtime.trap("Unauthorized: Only admins can publish this article");
             };
           };
@@ -843,7 +851,7 @@ actor {
               validateSuperAdminOrOrgOwner(caller, orgId);
             };
             case (null) {
-              if (not (AccessControl.isAdmin(accessControlState, caller))) {
+              if (not isAdminOrSuperAdmin(caller)) {
                 Runtime.trap("Unauthorized: Only admins can delete this article");
               };
             };
@@ -946,6 +954,8 @@ actor {
             };
             let published = { article with isPublished = true };
             articles.add(articleId, published);
+            // Mark submission as approved by removing the pending record
+            articleSubmissions.remove(articleId);
           };
         };
       };
@@ -1020,7 +1030,7 @@ actor {
   // === ARTICLE QUERIES ===
 
   public query ({ caller }) func getAllArticles() : async [Article] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+    if (not isAdminOrSuperAdmin(caller)) {
       Runtime.trap("Unauthorized: Only admins can view all articles");
     };
 
