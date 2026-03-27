@@ -229,8 +229,20 @@ export interface backendInterface {
     unpublishArticle(articleId: bigint): Promise<void>;
     updateArticle(articleId: bigint, title: string, author: string, organizationId: bigint | null, publicationDate: string, imageBlobIds: Array<string>, bodyContent: string, tags: Array<string>): Promise<void>;
     updateOrg(orgId: bigint, name: string, slug: string, description: string, logoBlobId: string | null, bannerBlobId: string | null): Promise<void>;
+    createPuzzle(puzzleType: PuzzleType, title: string, gridWidth: bigint, gridHeight: bigint, cells: Array<CrosswordCell>, clues: Array<CrosswordClue>): Promise<bigint>;
+    updatePuzzle(id: bigint, title: string, gridWidth: bigint, gridHeight: bigint, cells: Array<CrosswordCell>, clues: Array<CrosswordClue>): Promise<void>;
+    deletePuzzle(id: bigint): Promise<void>;
+    getAllPuzzles(): Promise<Array<Puzzle>>;
+    getActivePuzzle(puzzleType: PuzzleType): Promise<Puzzle | null>;
+    setActivePuzzle(id: bigint): Promise<void>;
 }
 import type { Article as _Article, ArticleSubmission as _ArticleSubmission, OrgInvite as _OrgInvite, OrgInviteStatus as _OrgInviteStatus, OrgSection as _OrgSection, SubmissionStatus as _SubmissionStatus, SubmissionWithArticle as _SubmissionWithArticle, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
+// Raw Candid puzzle types
+type _ClueDirection = { across: null } | { down: null };
+type _PuzzleType = { mini: null } | { standard: null };
+type _CrosswordCell = { letter: string; isBlack: boolean; number: [] | [bigint] };
+type _CrosswordClue = { number: bigint; direction: _ClueDirection; clue: string; answer: string; startRow: bigint; startCol: bigint; length: bigint };
+type _Puzzle = { id: bigint; puzzleType: _PuzzleType; title: string; gridWidth: bigint; gridHeight: bigint; cells: Array<_CrosswordCell>; clues: Array<_CrosswordClue>; isActive: boolean; createdAt: bigint; publishedAt: [] | [bigint]; createdBy: any };
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _caffeineStorageBlobIsLive(arg0: Uint8Array): Promise<boolean> {
@@ -947,6 +959,88 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async createPuzzle(arg0, arg1, arg2, arg3, arg4, arg5) {
+        const rawType = to_candid_puzzle_type(arg0);
+        const rawCells = arg4.map(to_candid_crossword_cell);
+        const rawClues = arg5.map(to_candid_crossword_clue);
+        if (this.processError) {
+            try {
+                return await this.actor.createPuzzle(rawType, arg1, arg2, arg3, rawCells, rawClues);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.createPuzzle(rawType, arg1, arg2, arg3, rawCells, rawClues);
+        }
+    }
+    async updatePuzzle(arg0, arg1, arg2, arg3, arg4, arg5) {
+        const rawCells = arg4.map(to_candid_crossword_cell);
+        const rawClues = arg5.map(to_candid_crossword_clue);
+        if (this.processError) {
+            try {
+                return await this.actor.updatePuzzle(arg0, arg1, arg2, arg3, rawCells, rawClues);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.updatePuzzle(arg0, arg1, arg2, arg3, rawCells, rawClues);
+        }
+    }
+    async deletePuzzle(arg0) {
+        if (this.processError) {
+            try {
+                return await this.actor.deletePuzzle(arg0);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.deletePuzzle(arg0);
+        }
+    }
+    async getAllPuzzles() {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllPuzzles();
+                return result.map(from_candid_puzzle);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllPuzzles();
+            return result.map(from_candid_puzzle);
+        }
+    }
+    async getActivePuzzle(arg0) {
+        const rawType = to_candid_puzzle_type(arg0);
+        if (this.processError) {
+            try {
+                const result = await this.actor.getActivePuzzle(rawType);
+                return result.length > 0 ? from_candid_puzzle(result[0]) : null;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getActivePuzzle(rawType);
+            return result.length > 0 ? from_candid_puzzle(result[0]) : null;
+        }
+    }
+    async setActivePuzzle(arg0) {
+        if (this.processError) {
+            try {
+                return await this.actor.setActivePuzzle(arg0);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            return await this.actor.setActivePuzzle(arg0);
+        }
+    }
 }
 function from_candid_ArticleSubmission_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ArticleSubmission): ArticleSubmission {
     return from_candid_record_n35(_uploadFile, _downloadFile, value);
@@ -1262,6 +1356,46 @@ function to_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     } : value == UserRole.guest ? {
         guest: null
     } : value;
+}
+// --- Puzzle encoding/decoding helpers ---
+function to_candid_puzzle_type(v) {
+    return v === 'mini' ? { mini: null } : { standard: null };
+}
+function from_candid_puzzle_type(v) {
+    return 'mini' in v ? 'mini' : 'standard';
+}
+function to_candid_clue_direction(v) {
+    return v === 'across' ? { across: null } : { down: null };
+}
+function from_candid_clue_direction(v) {
+    return 'across' in v ? 'across' : 'down';
+}
+function to_candid_crossword_cell(c) {
+    return { letter: c.letter, isBlack: c.isBlack, number: c.number !== undefined && c.number !== null ? [c.number] : [] };
+}
+function from_candid_crossword_cell(c) {
+    return { letter: c.letter, isBlack: c.isBlack, number: c.number.length > 0 ? c.number[0] : undefined };
+}
+function to_candid_crossword_clue(c) {
+    return { number: c.number, direction: to_candid_clue_direction(c.direction), clue: c.clue, answer: c.answer, startRow: c.startRow, startCol: c.startCol, length: c.length };
+}
+function from_candid_crossword_clue(c) {
+    return { number: c.number, direction: from_candid_clue_direction(c.direction), clue: c.clue, answer: c.answer, startRow: c.startRow, startCol: c.startCol, length: c.length };
+}
+function from_candid_puzzle(p) {
+    return {
+        id: p.id,
+        puzzleType: from_candid_puzzle_type(p.puzzleType),
+        title: p.title,
+        gridWidth: p.gridWidth,
+        gridHeight: p.gridHeight,
+        cells: p.cells.map(from_candid_crossword_cell),
+        clues: p.clues.map(from_candid_crossword_clue),
+        isActive: p.isActive,
+        createdAt: p.createdAt,
+        publishedAt: p.publishedAt.length > 0 ? p.publishedAt[0] : undefined,
+        createdBy: p.createdBy,
+    };
 }
 export interface CreateActorOptions {
     agent?: Agent;

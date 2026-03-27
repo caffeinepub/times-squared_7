@@ -81,6 +81,35 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export type ClueDirection = { 'across' : null } | { 'down' : null };
+export type PuzzleType = { 'mini' : null } | { 'standard' : null };
+export interface CrosswordCell {
+  'letter' : string,
+  'isBlack' : boolean,
+  'number' : [] | [bigint],
+}
+export interface CrosswordClue {
+  'number' : bigint,
+  'direction' : ClueDirection,
+  'clue' : string,
+  'answer' : string,
+  'startRow' : bigint,
+  'startCol' : bigint,
+  'length' : bigint,
+}
+export interface Puzzle {
+  'id' : bigint,
+  'puzzleType' : PuzzleType,
+  'title' : string,
+  'gridWidth' : bigint,
+  'gridHeight' : bigint,
+  'cells' : Array<CrosswordCell>,
+  'clues' : Array<CrosswordClue>,
+  'isActive' : boolean,
+  'createdAt' : bigint,
+  'publishedAt' : [] | [bigint],
+  'createdBy' : Principal,
+}
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
@@ -130,11 +159,25 @@ export interface _SERVICE {
     [string, string, string, [] | [string], [] | [string]],
     bigint
   >,
+  'createPuzzle' : ActorMethod<
+    [
+      PuzzleType,
+      string,
+      bigint,
+      bigint,
+      Array<CrosswordCell>,
+      Array<CrosswordClue>,
+    ],
+    bigint
+  >,
   'deleteArticle' : ActorMethod<[bigint], undefined>,
   'deleteComment' : ActorMethod<[bigint], undefined>,
   'deleteOrg' : ActorMethod<[bigint], undefined>,
+  'deletePuzzle' : ActorMethod<[bigint], undefined>,
   'featureArticle' : ActorMethod<[bigint], undefined>,
   'getAllArticles' : ActorMethod<[], Array<Article>>,
+  'getAllPuzzles' : ActorMethod<[], Array<Puzzle>>,
+  'getActivePuzzle' : ActorMethod<[PuzzleType], [] | [Puzzle]>,
   'getArticleById' : ActorMethod<[bigint], Article>,
   'getArticlesByOrg' : ActorMethod<[bigint], Array<Article>>,
   'getArticlesByTag' : ActorMethod<[string], Array<Article>>,
@@ -163,6 +206,7 @@ export interface _SERVICE {
   'respondToOrgInvite' : ActorMethod<[bigint, boolean], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchArticles' : ActorMethod<[string], Array<Article>>,
+  'setActivePuzzle' : ActorMethod<[bigint], undefined>,
   'submitArticleForReview' : ActorMethod<[bigint], undefined>,
   'unfeatureArticle' : ActorMethod<[bigint], undefined>,
   'unpublishArticle' : ActorMethod<[bigint], undefined>,
@@ -181,6 +225,17 @@ export interface _SERVICE {
   >,
   'updateOrg' : ActorMethod<
     [bigint, string, string, string, [] | [string], [] | [string]],
+    undefined
+  >,
+  'updatePuzzle' : ActorMethod<
+    [
+      bigint,
+      string,
+      bigint,
+      bigint,
+      Array<CrosswordCell>,
+      Array<CrosswordClue>,
+    ],
     undefined
   >,
 }
