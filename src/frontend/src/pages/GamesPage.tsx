@@ -65,6 +65,12 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+
+  const focusForInput = () => {
+    hiddenInputRef.current?.focus();
+    containerRef.current?.focus();
+  };
 
   // Flat cells with precomputed row/col for stable keying
   const flatCells: FlatCell[] = puzzle.cells.map((cellData, flatIdx) => ({
@@ -147,7 +153,7 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
     } else {
       setSelectedCell({ row, col });
     }
-    containerRef.current?.focus();
+    focusForInput();
   };
 
   const handleContainerKeyDown = (e: React.KeyboardEvent) => {
@@ -203,6 +209,47 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
       const next = advanceCell(row, col, direction);
       if (next) setSelectedCell(next);
     }
+  };
+
+  const handleHiddenInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nativeEvent = e.nativeEvent as InputEvent;
+    if (nativeEvent.inputType === "insertText" && selectedCell) {
+      const inserted = nativeEvent.data ?? "";
+      if (/[a-zA-Z]/.test(inserted)) {
+        const letter = inserted.toUpperCase();
+        const { row, col } = selectedCell;
+        const newGrid = userGrid.map((r) => [...r]);
+        if (newGrid[row]) newGrid[row][col] = letter;
+        setUserGrid(newGrid);
+        const newChecked = checkedGrid.map((r) => [...r]);
+        if (newChecked[row]) newChecked[row][col] = null;
+        setCheckedGrid(newChecked);
+        const next = advanceCell(row, col, direction);
+        if (next) setSelectedCell(next);
+      }
+    } else if (
+      (nativeEvent.inputType === "deleteContentBackward" ||
+        nativeEvent.inputType === "deleteContentForward") &&
+      selectedCell
+    ) {
+      const { row, col } = selectedCell;
+      const newGrid = userGrid.map((r) => [...r]);
+      if (newGrid[row]?.[col]) {
+        newGrid[row][col] = "";
+        setUserGrid(newGrid);
+      } else {
+        const prev = retreatCell(row, col, direction);
+        if (prev) {
+          newGrid[prev.row][prev.col] = "";
+          setSelectedCell(prev);
+          setUserGrid(newGrid);
+        }
+      }
+      const newChecked = checkedGrid.map((r) => [...r]);
+      if (newChecked[row]) newChecked[row][col] = null;
+      setCheckedGrid(newChecked);
+    }
+    e.target.value = "";
   };
 
   const handleCheck = () => {
@@ -288,9 +335,32 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
         role="application"
         aria-label="Crossword puzzle grid"
         onKeyDown={handleContainerKeyDown}
-        className="outline-none inline-block focus:ring-1 focus:ring-white/20"
+        className="outline-none inline-block focus:ring-1 focus:ring-white/20 relative"
         data-ocid="games.canvas_target"
       >
+        {/* Hidden input — focused on cell tap to open mobile keyboard */}
+        <input
+          ref={hiddenInputRef}
+          type="text"
+          inputMode="text"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          tabIndex={-1}
+          onKeyDown={handleContainerKeyDown}
+          onChange={handleHiddenInputChange}
+          style={{
+            position: "absolute",
+            opacity: 0,
+            width: 1,
+            height: 1,
+            top: 0,
+            left: 0,
+            pointerEvents: "none",
+            zIndex: -1,
+          }}
+        />
         <div
           className="inline-grid border border-white/20"
           style={{
@@ -415,7 +485,7 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
                       col: Number(clue.startCol),
                     });
                     setDirection("across");
-                    containerRef.current?.focus();
+                    focusForInput();
                   }}
                   className={`text-left w-full flex gap-2 text-sm font-sans py-1 transition-colors ${
                     isActive
@@ -449,7 +519,7 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
                       col: Number(clue.startCol),
                     });
                     setDirection("down");
-                    containerRef.current?.focus();
+                    focusForInput();
                   }}
                   className={`text-left w-full flex gap-2 text-sm font-sans py-1 transition-colors ${
                     isActive
