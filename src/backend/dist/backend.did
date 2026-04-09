@@ -1,0 +1,212 @@
+type _ImmutableObjectStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _ImmutableObjectStorageRefillInformation = record {
+                                                  proposed_top_up_amount:
+                                                   opt nat;};
+type _ImmutableObjectStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserProfile = 
+ record {
+   avatarBlobId: opt text;
+   bio: text;
+   name: text;
+   orgId: opt nat;
+   "principal": principal;
+ };
+type SubmissionWithArticle = 
+ record {
+   article: Article;
+   submission: ArticleSubmission;
+ };
+type SubmissionStatus = 
+ variant {
+   draft;
+   pending_review;
+   rejected;
+ };
+type PuzzleType = 
+ variant {
+   mini;
+   standard;
+ };
+type Puzzle = 
+ record {
+   cells: vec CrosswordCell;
+   clues: vec CrosswordClue;
+   createdAt: int;
+   createdBy: principal;
+   gridHeight: nat;
+   gridWidth: nat;
+   id: nat;
+   isActive: bool;
+   publishedAt: opt int;
+   puzzleType: PuzzleType;
+   title: text;
+ };
+type OrgSection = 
+ record {
+   bannerBlobId: opt text;
+   createdAt: int;
+   description: text;
+   id: nat;
+   logoBlobId: opt text;
+   name: text;
+   slug: text;
+ };
+type OrgMembership = 
+ record {
+   joinedAt: int;
+   memberPrincipal: principal;
+   orgId: nat;
+ };
+type OrgInviteStatus = 
+ variant {
+   accepted;
+   declined;
+   pending;
+ };
+type OrgInvite = 
+ record {
+   createdAt: int;
+   inviteId: nat;
+   invitedByPrincipal: principal;
+   invitedPrincipal: principal;
+   orgId: nat;
+   status: OrgInviteStatus;
+ };
+type CrosswordClue = 
+ record {
+   answer: text;
+   clue: text;
+   direction: ClueDirection;
+   length: nat;
+   number: nat;
+   startCol: nat;
+   startRow: nat;
+ };
+type CrosswordCell = 
+ record {
+   isBlack: bool;
+   letter: text;
+   number: opt nat;
+ };
+type Comment = 
+ record {
+   articleId: nat;
+   authorName: text;
+   authorPrincipal: principal;
+   body: text;
+   createdAt: int;
+   id: nat;
+ };
+type ClueDirection = 
+ variant {
+   across;
+   down;
+ };
+type ArticleSubmission = 
+ record {
+   articleId: nat;
+   rejectionNote: opt text;
+   submissionStatus: SubmissionStatus;
+   submittedAt: opt int;
+ };
+type Article = 
+ record {
+   author: text;
+   authorPrincipal: opt principal;
+   bodyContent: text;
+   createdAt: int;
+   excerpt: text;
+   id: nat;
+   imageBlobIds: vec text;
+   isFeatured: bool;
+   isPublished: bool;
+   organizationId: opt nat;
+   publicationDate: text;
+   tags: vec text;
+   title: text;
+ };
+service : {
+  _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
+  _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
+  _immutableObjectStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _immutableObjectStorageCreateCertificate: (blobHash: text) ->
+   (_ImmutableObjectStorageCreateCertificateResult);
+  _immutableObjectStorageRefillCashier: (refillInformation:
+   opt _ImmutableObjectStorageRefillInformation) ->
+   (_ImmutableObjectStorageRefillResult);
+  _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
+  _initializeAccessControl: () -> ();
+  addComment: (articleId: nat, body: text) -> ();
+  approveArticleSubmission: (articleId: nat) -> ();
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  claimSuperAdmin: () -> ();
+  createArticle: (title: text, author: text, authorPrincipal: opt principal,
+   organizationId: opt nat, publicationDate: text, imageBlobIds: vec text,
+   bodyContent: text, tags: vec text) -> (nat);
+  createOrg: (name: text, slug: text, description: text, logoBlobId:
+   opt text, bannerBlobId: opt text) -> (nat);
+  createPuzzle: (puzzleType: PuzzleType, title: text, gridWidth: nat,
+   gridHeight: nat, cells: vec CrosswordCell, clues: vec CrosswordClue) ->
+   (nat);
+  deleteArticle: (articleId: nat) -> ();
+  deleteComment: (commentId: nat) -> ();
+  deleteOrg: (orgId: nat) -> ();
+  deletePuzzle: (id: nat) -> ();
+  featureArticle: (articleId: nat) -> ();
+  getActivePuzzle: (puzzleType: PuzzleType) -> (opt Puzzle) query;
+  getAllArticles: () -> (vec Article) query;
+  getAllPuzzles: () -> (vec Puzzle) query;
+  getArticleById: (articleId: nat) -> (Article) query;
+  getArticlesByOrg: (orgId: nat) -> (vec Article) query;
+  getArticlesByTag: (tag: text) -> (vec Article) query;
+  getAuthorArticles: (authorPrincipal: principal) -> (vec Article) query;
+  getCallerUserProfile: () -> (opt UserProfile) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getCommentsByArticle: (articleId: nat) -> (vec Comment) query;
+  getMyInvites: () -> (vec OrgInvite) query;
+  getMyMemberships: () -> (vec OrgMembership) query;
+  getMyOrgs: () -> (vec OrgSection) query;
+  getMySubmissions: () -> (vec SubmissionWithArticle) query;
+  getOrgArticles: (orgId: nat) -> (vec Article) query;
+  getOrgById: (orgId: nat) -> (opt OrgSection) query;
+  getOrgMembers: (orgId: nat) -> (vec OrgMembership) query;
+  getOrgs: () -> (vec OrgSection) query;
+  getPendingSubmissions: (orgId: nat) -> (vec SubmissionWithArticle) query;
+  getPublishedArticles: () -> (vec Article) query;
+  getSuperAdmin: () -> (opt principal) query;
+  getUserProfile: (user: principal) -> (opt UserProfile) query;
+  inviteUserToOrg: (orgId: nat, userPrincipal: principal) -> ();
+  isCallerAdmin: () -> (bool) query;
+  isOrgMember: (orgId: nat, user: principal) -> (bool) query;
+  publishArticle: (articleId: nat) -> ();
+  rejectArticleSubmission: (articleId: nat, note: opt text) -> ();
+  removeOrgMember: (orgId: nat, memberPrincipal: principal) -> ();
+  respondToOrgInvite: (inviteId: nat, accept: bool) -> ();
+  saveCallerUserProfile: (profile: UserProfile) -> ();
+  searchArticles: (queryText: text) -> (vec Article) query;
+  setActivePuzzle: (id: nat) -> ();
+  submitArticleForReview: (articleId: nat) -> ();
+  unfeatureArticle: (articleId: nat) -> ();
+  unpublishArticle: (articleId: nat) -> ();
+  updateArticle: (articleId: nat, title: text, author: text, organizationId:
+   opt nat, publicationDate: text, imageBlobIds: vec text, bodyContent: 
+   text, tags: vec text) -> ();
+  updateOrg: (orgId: nat, name: text, slug: text, description: text,
+   logoBlobId: opt text, bannerBlobId: opt text) -> ();
+  updatePuzzle: (id: nat, title: text, gridWidth: nat, gridHeight: nat,
+   cells: vec CrosswordCell, clues: vec CrosswordClue) -> ();
+}

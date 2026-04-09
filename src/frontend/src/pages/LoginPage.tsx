@@ -1,7 +1,7 @@
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect } from "react";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { navigate } from "../lib/navigate";
 
 export default function LoginPage() {

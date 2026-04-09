@@ -31,6 +31,8 @@ export interface ArticleSubmission {
   'articleId' : bigint,
   'rejectionNote' : [] | [string],
 }
+export type ClueDirection = { 'across' : null } |
+  { 'down' : null };
 export interface Comment {
   'id' : bigint,
   'body' : string,
@@ -38,6 +40,20 @@ export interface Comment {
   'authorName' : string,
   'articleId' : bigint,
   'authorPrincipal' : Principal,
+}
+export interface CrosswordCell {
+  'isBlack' : boolean,
+  'number' : [] | [bigint],
+  'letter' : string,
+}
+export interface CrosswordClue {
+  'direction' : ClueDirection,
+  'clue' : string,
+  'startCol' : bigint,
+  'startRow' : bigint,
+  'answer' : string,
+  'length' : bigint,
+  'number' : bigint,
 }
 export interface OrgInvite {
   'status' : OrgInviteStatus,
@@ -64,6 +80,21 @@ export interface OrgSection {
   'description' : string,
   'logoBlobId' : [] | [string],
 }
+export interface Puzzle {
+  'id' : bigint,
+  'title' : string,
+  'puzzleType' : PuzzleType,
+  'gridHeight' : bigint,
+  'cells' : Array<CrosswordCell>,
+  'clues' : Array<CrosswordClue>,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'publishedAt' : [] | [bigint],
+  'isActive' : boolean,
+  'gridWidth' : bigint,
+}
+export type PuzzleType = { 'mini' : null } |
+  { 'standard' : null };
 export type SubmissionStatus = { 'pending_review' : null } |
   { 'rejected' : null } |
   { 'draft' : null };
@@ -81,63 +112,37 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
-export type ClueDirection = { 'across' : null } | { 'down' : null };
-export type PuzzleType = { 'mini' : null } | { 'standard' : null };
-export interface CrosswordCell {
-  'letter' : string,
-  'isBlack' : boolean,
-  'number' : [] | [bigint],
-}
-export interface CrosswordClue {
-  'number' : bigint,
-  'direction' : ClueDirection,
-  'clue' : string,
-  'answer' : string,
-  'startRow' : bigint,
-  'startCol' : bigint,
-  'length' : bigint,
-}
-export interface Puzzle {
-  'id' : bigint,
-  'puzzleType' : PuzzleType,
-  'title' : string,
-  'gridWidth' : bigint,
-  'gridHeight' : bigint,
-  'cells' : Array<CrosswordCell>,
-  'clues' : Array<CrosswordClue>,
-  'isActive' : boolean,
-  'createdAt' : bigint,
-  'publishedAt' : [] | [bigint],
-  'createdBy' : Principal,
-}
-export interface _CaffeineStorageCreateCertificateResult {
+export interface _ImmutableObjectStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
 }
-export interface _CaffeineStorageRefillInformation {
+export interface _ImmutableObjectStorageRefillInformation {
   'proposed_top_up_amount' : [] | [bigint],
 }
-export interface _CaffeineStorageRefillResult {
+export interface _ImmutableObjectStorageRefillResult {
   'success' : [] | [boolean],
   'topped_up_amount' : [] | [bigint],
 }
 export interface _SERVICE {
-  '_caffeineStorageBlobIsLive' : ActorMethod<[Uint8Array], boolean>,
-  '_caffeineStorageBlobsToDelete' : ActorMethod<[], Array<Uint8Array>>,
-  '_caffeineStorageConfirmBlobDeletion' : ActorMethod<
+  '_immutableObjectStorageBlobsAreLive' : ActorMethod<
+    [Array<Uint8Array>],
+    Array<boolean>
+  >,
+  '_immutableObjectStorageBlobsToDelete' : ActorMethod<[], Array<Uint8Array>>,
+  '_immutableObjectStorageConfirmBlobDeletion' : ActorMethod<
     [Array<Uint8Array>],
     undefined
   >,
-  '_caffeineStorageCreateCertificate' : ActorMethod<
+  '_immutableObjectStorageCreateCertificate' : ActorMethod<
     [string],
-    _CaffeineStorageCreateCertificateResult
+    _ImmutableObjectStorageCreateCertificateResult
   >,
-  '_caffeineStorageRefillCashier' : ActorMethod<
-    [[] | [_CaffeineStorageRefillInformation]],
-    _CaffeineStorageRefillResult
+  '_immutableObjectStorageRefillCashier' : ActorMethod<
+    [[] | [_ImmutableObjectStorageRefillInformation]],
+    _ImmutableObjectStorageRefillResult
   >,
-  '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  '_immutableObjectStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
+  '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addComment' : ActorMethod<[bigint, string], undefined>,
   'approveArticleSubmission' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
@@ -175,9 +180,9 @@ export interface _SERVICE {
   'deleteOrg' : ActorMethod<[bigint], undefined>,
   'deletePuzzle' : ActorMethod<[bigint], undefined>,
   'featureArticle' : ActorMethod<[bigint], undefined>,
+  'getActivePuzzle' : ActorMethod<[PuzzleType], [] | [Puzzle]>,
   'getAllArticles' : ActorMethod<[], Array<Article>>,
   'getAllPuzzles' : ActorMethod<[], Array<Puzzle>>,
-  'getActivePuzzle' : ActorMethod<[PuzzleType], [] | [Puzzle]>,
   'getArticleById' : ActorMethod<[bigint], Article>,
   'getArticlesByOrg' : ActorMethod<[bigint], Array<Article>>,
   'getArticlesByTag' : ActorMethod<[string], Array<Article>>,

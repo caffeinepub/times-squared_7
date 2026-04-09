@@ -29,9 +29,36 @@ export interface Comment {
     articleId: bigint;
     authorPrincipal: Principal;
 }
+export interface CrosswordClue {
+    direction: ClueDirection;
+    clue: string;
+    startCol: bigint;
+    startRow: bigint;
+    answer: string;
+    length: bigint;
+    number: bigint;
+}
+export interface CrosswordCell {
+    isBlack: boolean;
+    number?: bigint;
+    letter: string;
+}
 export interface SubmissionWithArticle {
     article: Article;
     submission: ArticleSubmission;
+}
+export interface Puzzle {
+    id: bigint;
+    title: string;
+    puzzleType: PuzzleType;
+    gridHeight: bigint;
+    cells: Array<CrosswordCell>;
+    clues: Array<CrosswordClue>;
+    createdAt: bigint;
+    createdBy: Principal;
+    publishedAt?: bigint;
+    isActive: boolean;
+    gridWidth: bigint;
 }
 export interface OrgSection {
     id: bigint;
@@ -46,6 +73,13 @@ export interface OrgMembership {
     orgId: bigint;
     memberPrincipal: Principal;
     joinedAt: bigint;
+}
+export interface UserProfile {
+    bio: string;
+    principal: Principal;
+    orgId?: bigint;
+    name: string;
+    avatarBlobId?: string;
 }
 export interface Article {
     id: bigint;
@@ -62,44 +96,18 @@ export interface Article {
     excerpt: string;
     authorPrincipal?: Principal;
 }
-export interface UserProfile {
-    bio: string;
-    principal: Principal;
-    orgId?: bigint;
-    name: string;
-    avatarBlobId?: string;
-}
-export interface CrosswordCell {
-    letter: string;
-    isBlack: boolean;
-    number?: bigint;
-}
-export interface CrosswordClue {
-    number: bigint;
-    direction: ClueDirection;
-    clue: string;
-    answer: string;
-    startRow: bigint;
-    startCol: bigint;
-    length: bigint;
-}
-export interface Puzzle {
-    id: bigint;
-    puzzleType: PuzzleType;
-    title: string;
-    gridWidth: bigint;
-    gridHeight: bigint;
-    cells: Array<CrosswordCell>;
-    clues: Array<CrosswordClue>;
-    isActive: boolean;
-    createdAt: bigint;
-    publishedAt?: bigint;
-    createdBy: Principal;
+export enum ClueDirection {
+    across = "across",
+    down = "down"
 }
 export enum OrgInviteStatus {
     pending = "pending",
     accepted = "accepted",
     declined = "declined"
+}
+export enum PuzzleType {
+    mini = "mini",
+    standard = "standard"
 }
 export enum SubmissionStatus {
     pending_review = "pending_review",
@@ -110,14 +118,6 @@ export enum UserRole {
     admin = "admin",
     user = "user",
     guest = "guest"
-}
-export enum PuzzleType {
-    mini = "mini",
-    standard = "standard"
-}
-export enum ClueDirection {
-    across = "across",
-    down = "down"
 }
 export interface backendInterface {
     addComment(articleId: bigint, body: string): Promise<void>;
@@ -132,9 +132,9 @@ export interface backendInterface {
     deleteOrg(orgId: bigint): Promise<void>;
     deletePuzzle(id: bigint): Promise<void>;
     featureArticle(articleId: bigint): Promise<void>;
+    getActivePuzzle(puzzleType: PuzzleType): Promise<Puzzle | null>;
     getAllArticles(): Promise<Array<Article>>;
     getAllPuzzles(): Promise<Array<Puzzle>>;
-    getActivePuzzle(puzzleType: PuzzleType): Promise<Puzzle | null>;
     getArticleById(articleId: bigint): Promise<Article>;
     getArticlesByOrg(orgId: bigint): Promise<Array<Article>>;
     getArticlesByTag(tag: string): Promise<Array<Article>>;

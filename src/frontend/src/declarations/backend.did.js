@@ -8,14 +8,14 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const _CaffeineStorageCreateCertificateResult = IDL.Record({
+export const _ImmutableObjectStorageCreateCertificateResult = IDL.Record({
   'method' : IDL.Text,
   'blob_hash' : IDL.Text,
 });
-export const _CaffeineStorageRefillInformation = IDL.Record({
+export const _ImmutableObjectStorageRefillInformation = IDL.Record({
   'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
 });
-export const _CaffeineStorageRefillResult = IDL.Record({
+export const _ImmutableObjectStorageRefillResult = IDL.Record({
   'success' : IDL.Opt(IDL.Bool),
   'topped_up_amount' : IDL.Opt(IDL.Nat),
 });
@@ -23,6 +23,41 @@ export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
   'guest' : IDL.Null,
+});
+export const PuzzleType = IDL.Variant({
+  'mini' : IDL.Null,
+  'standard' : IDL.Null,
+});
+export const CrosswordCell = IDL.Record({
+  'isBlack' : IDL.Bool,
+  'number' : IDL.Opt(IDL.Nat),
+  'letter' : IDL.Text,
+});
+export const ClueDirection = IDL.Variant({
+  'across' : IDL.Null,
+  'down' : IDL.Null,
+});
+export const CrosswordClue = IDL.Record({
+  'direction' : ClueDirection,
+  'clue' : IDL.Text,
+  'startCol' : IDL.Nat,
+  'startRow' : IDL.Nat,
+  'answer' : IDL.Text,
+  'length' : IDL.Nat,
+  'number' : IDL.Nat,
+});
+export const Puzzle = IDL.Record({
+  'id' : IDL.Nat,
+  'title' : IDL.Text,
+  'puzzleType' : PuzzleType,
+  'gridHeight' : IDL.Nat,
+  'cells' : IDL.Vec(CrosswordCell),
+  'clues' : IDL.Vec(CrosswordClue),
+  'createdAt' : IDL.Int,
+  'createdBy' : IDL.Principal,
+  'publishedAt' : IDL.Opt(IDL.Int),
+  'isActive' : IDL.Bool,
+  'gridWidth' : IDL.Nat,
 });
 export const Article = IDL.Record({
   'id' : IDL.Nat,
@@ -96,70 +131,35 @@ export const SubmissionWithArticle = IDL.Record({
   'article' : Article,
   'submission' : ArticleSubmission,
 });
-export const ClueDirection = IDL.Variant({
-  'across' : IDL.Null,
-  'down' : IDL.Null,
-});
-export const PuzzleType = IDL.Variant({
-  'mini' : IDL.Null,
-  'standard' : IDL.Null,
-});
-export const CrosswordCell = IDL.Record({
-  'letter' : IDL.Text,
-  'isBlack' : IDL.Bool,
-  'number' : IDL.Opt(IDL.Nat),
-});
-export const CrosswordClue = IDL.Record({
-  'number' : IDL.Nat,
-  'direction' : ClueDirection,
-  'clue' : IDL.Text,
-  'answer' : IDL.Text,
-  'startRow' : IDL.Nat,
-  'startCol' : IDL.Nat,
-  'length' : IDL.Nat,
-});
-export const Puzzle = IDL.Record({
-  'id' : IDL.Nat,
-  'puzzleType' : PuzzleType,
-  'title' : IDL.Text,
-  'gridWidth' : IDL.Nat,
-  'gridHeight' : IDL.Nat,
-  'cells' : IDL.Vec(CrosswordCell),
-  'clues' : IDL.Vec(CrosswordClue),
-  'isActive' : IDL.Bool,
-  'createdAt' : IDL.Int,
-  'publishedAt' : IDL.Opt(IDL.Int),
-  'createdBy' : IDL.Principal,
-});
 
 export const idlService = IDL.Service({
-  '_caffeineStorageBlobIsLive' : IDL.Func(
-      [IDL.Vec(IDL.Nat8)],
-      [IDL.Bool],
+  '_immutableObjectStorageBlobsAreLive' : IDL.Func(
+      [IDL.Vec(IDL.Vec(IDL.Nat8))],
+      [IDL.Vec(IDL.Bool)],
       ['query'],
     ),
-  '_caffeineStorageBlobsToDelete' : IDL.Func(
+  '_immutableObjectStorageBlobsToDelete' : IDL.Func(
       [],
       [IDL.Vec(IDL.Vec(IDL.Nat8))],
       ['query'],
     ),
-  '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+  '_immutableObjectStorageConfirmBlobDeletion' : IDL.Func(
       [IDL.Vec(IDL.Vec(IDL.Nat8))],
       [],
       [],
     ),
-  '_caffeineStorageCreateCertificate' : IDL.Func(
+  '_immutableObjectStorageCreateCertificate' : IDL.Func(
       [IDL.Text],
-      [_CaffeineStorageCreateCertificateResult],
+      [_ImmutableObjectStorageCreateCertificateResult],
       [],
     ),
-  '_caffeineStorageRefillCashier' : IDL.Func(
-      [IDL.Opt(_CaffeineStorageRefillInformation)],
-      [_CaffeineStorageRefillResult],
+  '_immutableObjectStorageRefillCashier' : IDL.Func(
+      [IDL.Opt(_ImmutableObjectStorageRefillInformation)],
+      [_ImmutableObjectStorageRefillResult],
       [],
     ),
-  '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
+  '_initializeAccessControl' : IDL.Func([], [], []),
   'addComment' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'approveArticleSubmission' : IDL.Func([IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
@@ -200,9 +200,9 @@ export const idlService = IDL.Service({
   'deleteOrg' : IDL.Func([IDL.Nat], [], []),
   'deletePuzzle' : IDL.Func([IDL.Nat], [], []),
   'featureArticle' : IDL.Func([IDL.Nat], [], []),
+  'getActivePuzzle' : IDL.Func([PuzzleType], [IDL.Opt(Puzzle)], ['query']),
   'getAllArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
   'getAllPuzzles' : IDL.Func([], [IDL.Vec(Puzzle)], ['query']),
-  'getActivePuzzle' : IDL.Func([PuzzleType], [IDL.Opt(Puzzle)], ['query']),
   'getArticleById' : IDL.Func([IDL.Nat], [Article], ['query']),
   'getArticlesByOrg' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
   'getArticlesByTag' : IDL.Func([IDL.Text], [IDL.Vec(Article)], ['query']),
@@ -294,14 +294,14 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const _CaffeineStorageCreateCertificateResult = IDL.Record({
+  const _ImmutableObjectStorageCreateCertificateResult = IDL.Record({
     'method' : IDL.Text,
     'blob_hash' : IDL.Text,
   });
-  const _CaffeineStorageRefillInformation = IDL.Record({
+  const _ImmutableObjectStorageRefillInformation = IDL.Record({
     'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
   });
-  const _CaffeineStorageRefillResult = IDL.Record({
+  const _ImmutableObjectStorageRefillResult = IDL.Record({
     'success' : IDL.Opt(IDL.Bool),
     'topped_up_amount' : IDL.Opt(IDL.Nat),
   });
@@ -309,6 +309,35 @@ export const idlFactory = ({ IDL }) => {
     'admin' : IDL.Null,
     'user' : IDL.Null,
     'guest' : IDL.Null,
+  });
+  const PuzzleType = IDL.Variant({ 'mini' : IDL.Null, 'standard' : IDL.Null });
+  const CrosswordCell = IDL.Record({
+    'isBlack' : IDL.Bool,
+    'number' : IDL.Opt(IDL.Nat),
+    'letter' : IDL.Text,
+  });
+  const ClueDirection = IDL.Variant({ 'across' : IDL.Null, 'down' : IDL.Null });
+  const CrosswordClue = IDL.Record({
+    'direction' : ClueDirection,
+    'clue' : IDL.Text,
+    'startCol' : IDL.Nat,
+    'startRow' : IDL.Nat,
+    'answer' : IDL.Text,
+    'length' : IDL.Nat,
+    'number' : IDL.Nat,
+  });
+  const Puzzle = IDL.Record({
+    'id' : IDL.Nat,
+    'title' : IDL.Text,
+    'puzzleType' : PuzzleType,
+    'gridHeight' : IDL.Nat,
+    'cells' : IDL.Vec(CrosswordCell),
+    'clues' : IDL.Vec(CrosswordClue),
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'publishedAt' : IDL.Opt(IDL.Int),
+    'isActive' : IDL.Bool,
+    'gridWidth' : IDL.Nat,
   });
   const Article = IDL.Record({
     'id' : IDL.Nat,
@@ -382,73 +411,38 @@ export const idlFactory = ({ IDL }) => {
     'article' : Article,
     'submission' : ArticleSubmission,
   });
-  const ClueDirection = IDL.Variant({
-    'across' : IDL.Null,
-    'down' : IDL.Null,
-  });
-  const PuzzleType = IDL.Variant({
-    'mini' : IDL.Null,
-    'standard' : IDL.Null,
-  });
-  const CrosswordCell = IDL.Record({
-    'letter' : IDL.Text,
-    'isBlack' : IDL.Bool,
-    'number' : IDL.Opt(IDL.Nat),
-  });
-  const CrosswordClue = IDL.Record({
-    'number' : IDL.Nat,
-    'direction' : ClueDirection,
-    'clue' : IDL.Text,
-    'answer' : IDL.Text,
-    'startRow' : IDL.Nat,
-    'startCol' : IDL.Nat,
-    'length' : IDL.Nat,
-  });
-  const Puzzle = IDL.Record({
-    'id' : IDL.Nat,
-    'puzzleType' : PuzzleType,
-    'title' : IDL.Text,
-    'gridWidth' : IDL.Nat,
-    'gridHeight' : IDL.Nat,
-    'cells' : IDL.Vec(CrosswordCell),
-    'clues' : IDL.Vec(CrosswordClue),
-    'isActive' : IDL.Bool,
-    'createdAt' : IDL.Int,
-    'publishedAt' : IDL.Opt(IDL.Int),
-    'createdBy' : IDL.Principal,
-  });
   
   return IDL.Service({
-    '_caffeineStorageBlobIsLive' : IDL.Func(
-        [IDL.Vec(IDL.Nat8)],
-        [IDL.Bool],
+    '_immutableObjectStorageBlobsAreLive' : IDL.Func(
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        [IDL.Vec(IDL.Bool)],
         ['query'],
       ),
-    '_caffeineStorageBlobsToDelete' : IDL.Func(
+    '_immutableObjectStorageBlobsToDelete' : IDL.Func(
         [],
         [IDL.Vec(IDL.Vec(IDL.Nat8))],
         ['query'],
       ),
-    '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+    '_immutableObjectStorageConfirmBlobDeletion' : IDL.Func(
         [IDL.Vec(IDL.Vec(IDL.Nat8))],
         [],
         [],
       ),
-    '_caffeineStorageCreateCertificate' : IDL.Func(
+    '_immutableObjectStorageCreateCertificate' : IDL.Func(
         [IDL.Text],
-        [_CaffeineStorageCreateCertificateResult],
+        [_ImmutableObjectStorageCreateCertificateResult],
         [],
       ),
-    '_caffeineStorageRefillCashier' : IDL.Func(
-        [IDL.Opt(_CaffeineStorageRefillInformation)],
-        [_CaffeineStorageRefillResult],
+    '_immutableObjectStorageRefillCashier' : IDL.Func(
+        [IDL.Opt(_ImmutableObjectStorageRefillInformation)],
+        [_ImmutableObjectStorageRefillResult],
         [],
       ),
-    '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
+    '_initializeAccessControl' : IDL.Func([], [], []),
     'addComment' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'approveArticleSubmission' : IDL.Func([IDL.Nat], [], []),
-    'assignCallerUserRole' : IDL.Func([IDL.Principal, IDL.Text], [], []),
+    'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'claimSuperAdmin' : IDL.Func([], [], []),
     'createArticle' : IDL.Func(
         [
@@ -486,9 +480,9 @@ export const idlFactory = ({ IDL }) => {
     'deleteOrg' : IDL.Func([IDL.Nat], [], []),
     'deletePuzzle' : IDL.Func([IDL.Nat], [], []),
     'featureArticle' : IDL.Func([IDL.Nat], [], []),
+    'getActivePuzzle' : IDL.Func([PuzzleType], [IDL.Opt(Puzzle)], ['query']),
     'getAllArticles' : IDL.Func([], [IDL.Vec(Article)], ['query']),
     'getAllPuzzles' : IDL.Func([], [IDL.Vec(Puzzle)], ['query']),
-    'getActivePuzzle' : IDL.Func([PuzzleType], [IDL.Opt(Puzzle)], ['query']),
     'getArticleById' : IDL.Func([IDL.Nat], [Article], ['query']),
     'getArticlesByOrg' : IDL.Func([IDL.Nat], [IDL.Vec(Article)], ['query']),
     'getArticlesByTag' : IDL.Func([IDL.Text], [IDL.Vec(Article)], ['query']),

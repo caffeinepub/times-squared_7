@@ -1,7 +1,7 @@
+import { loadConfig } from "@caffeineai/core-infrastructure";
+import { StorageClient } from "@caffeineai/object-storage";
 import { HttpAgent } from "@icp-sdk/core/agent";
 import { useCallback, useState } from "react";
-import { loadConfig } from "../config";
-import { StorageClient } from "../utils/StorageClient";
 
 /**
  * Upload a File to blob storage and return its direct URL as a blobId string.
@@ -10,7 +10,7 @@ import { StorageClient } from "../utils/StorageClient";
  */
 export async function uploadFileToBlobStorage(file: File): Promise<string> {
   const config = await loadConfig();
-  const agent = new HttpAgent({ host: config.backend_host });
+  const agent = HttpAgent.createSync({ host: config.backend_host });
   if (config.backend_host?.includes("localhost")) {
     await agent.fetchRootKey().catch(() => {});
   }
@@ -24,7 +24,7 @@ export async function uploadFileToBlobStorage(file: File): Promise<string> {
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { hash } = await storageClient.putFile(bytes);
-  return storageClient.getDirectURL(hash);
+  return await storageClient.getDirectURL(hash);
 }
 
 /**

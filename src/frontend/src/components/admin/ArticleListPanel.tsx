@@ -10,10 +10,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { FilePlus, Pencil, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Article } from "../../backend.d";
-import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import {
   useDeleteArticle,
   useFeatureArticle,

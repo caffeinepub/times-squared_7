@@ -1,12 +1,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { ArrowLeft, Edit2, Loader2, Save, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ExternalBlob } from "../backend";
 import ArticleCard from "../components/ArticleCard";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetAuthorArticles,
   useGetMyMemberships,

@@ -5,12 +5,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { OrgInvite } from "../backend.d";
 import { OrgInviteStatus } from "../backend.d";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useGetMyInvites,
   useGetOrgs,

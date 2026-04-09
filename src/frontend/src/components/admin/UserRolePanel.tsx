@@ -6,11 +6,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../../backend.d";
-import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import { useAssignUserRole, useGetSuperAdmin } from "../../hooks/useQueries";
 
 export default function UserRolePanel() {

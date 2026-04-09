@@ -9,9 +9,9 @@ import List "mo:core/List";
 import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
 import Principal "mo:core/Principal";
-import AccessControl "authorization/access-control";
-import MixinAuthorization "authorization/MixinAuthorization";
-import MixinStorage "blob-storage/Mixin";
+import AccessControl "mo:caffeineai-authorization/access-control";
+import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
+import MixinObjectStorage "mo:caffeineai-object-storage/Mixin";
 
 actor {
   type Article = {
@@ -154,7 +154,7 @@ actor {
   };
 
   // State
-  include MixinStorage();
+    include MixinObjectStorage();
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 

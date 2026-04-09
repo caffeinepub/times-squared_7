@@ -1,0 +1,161 @@
+// Version: 1.0.0
+type ArticleSubmission__692348418 =
+  {
+    articleId : Nat;
+    rejectionNote : ?Text;
+    submissionStatus : SubmissionStatus__62805680;
+    submittedAt : ?Int
+  };
+type Article__693132840 =
+  {
+    author : Text;
+    authorPrincipal : ?Principal;
+    bodyContent : Text;
+    createdAt : Int;
+    excerpt : Text;
+    id : Nat;
+    imageBlobIds : [Text];
+    isFeatured : Bool;
+    isPublished : Bool;
+    organizationId : ?Nat;
+    publicationDate : Text;
+    tags : [Text];
+    title : Text
+  };
+type ClueDirection__398447867 = {#across; #down};
+type Comment__473346131 =
+  {
+    articleId : Nat;
+    authorName : Text;
+    authorPrincipal : Principal;
+    body : Text;
+    createdAt : Int;
+    id : Nat
+  };
+type CrosswordCell__304363144 =
+  {isBlack : Bool; letter : Text; number : ?Nat};
+type CrosswordClue__741010920 =
+  {
+    answer : Text;
+    clue : Text;
+    direction : ClueDirection__398447867;
+    length : Nat;
+    number : Nat;
+    startCol : Nat;
+    startRow : Nat
+  };
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type OrgInviteStatus__170437929 = {#accepted; #declined; #pending};
+type OrgInvite__491790313 =
+  {
+    createdAt : Int;
+    inviteId : Nat;
+    invitedByPrincipal : Principal;
+    invitedPrincipal : Principal;
+    orgId : Nat;
+    status : OrgInviteStatus__170437929
+  };
+type OrgMembership__234927681 =
+  {joinedAt : Int; memberPrincipal : Principal; orgId : Nat};
+type OrgSection__62927543 =
+  {
+    bannerBlobId : ?Text;
+    createdAt : Int;
+    description : Text;
+    id : Nat;
+    logoBlobId : ?Text;
+    name : Text;
+    slug : Text
+  };
+type PuzzleType__890347145 = {#mini; #standard};
+type Puzzle__44274465 =
+  {
+    cells : [CrosswordCell__304363144];
+    clues : [CrosswordClue__741010920];
+    createdAt : Int;
+    createdBy : Principal;
+    gridHeight : Nat;
+    gridWidth : Nat;
+    id : Nat;
+    isActive : Bool;
+    publishedAt : ?Int;
+    puzzleType : PuzzleType__890347145;
+    title : Text
+  };
+type SubmissionStatus__62805680 = {#draft; #pending_review; #rejected};
+type UserProfile__491224006 =
+  {
+    avatarBlobId : ?Text;
+    bio : Text;
+    name : Text;
+    orgId : ?Nat;
+    principal : Principal
+  };
+type UserRole__1054455867 = {#admin; #guest; #user};
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable var articleIdCounter : Nat;
+  stable var articleSubmissions :
+    {
+      var root : Node__46230540<Nat, ArticleSubmission__692348418>;
+      var size : Nat__490723111
+    };
+  stable var articles :
+    {
+      var root : Node__46230540<Nat, Article__693132840>;
+      var size : Nat__490723111
+    };
+  stable var commentIdCounter : Nat;
+  stable var comments :
+    {
+      var root : Node__46230540<Nat, Comment__473346131>;
+      var size : Nat__490723111
+    };
+  stable var inviteIdCounter : Nat;
+  stable var orgIdCounter : Nat;
+  stable var orgInvites :
+    {
+      var root : Node__46230540<Nat, OrgInvite__491790313>;
+      var size : Nat__490723111
+    };
+  stable var orgMemberships :
+    {
+      var root : Node__46230540<Text, OrgMembership__234927681>;
+      var size : Nat__490723111
+    };
+  stable var orgOwners :
+    {var root : Node__46230540<Nat, Principal>; var size : Nat__490723111};
+  stable var organizations :
+    {
+      var root : Node__46230540<Nat, OrgSection__62927543>;
+      var size : Nat__490723111
+    };
+  stable var puzzleIdCounter : Nat;
+  stable var puzzles :
+    {
+      var root : Node__46230540<Nat, Puzzle__44274465>;
+      var size : Nat__490723111
+    };
+  stable var superAdmin : ?Principal;
+  stable var userProfiles :
+    {
+      var root : Node__46230540<Principal, UserProfile__491224006>;
+      var size : Nat__490723111
+    }
+};

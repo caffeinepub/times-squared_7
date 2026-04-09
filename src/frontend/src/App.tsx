@@ -1,8 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
+import { loadConfig } from "@caffeineai/core-infrastructure";
 import { useEffect, useState } from "react";
 import Header from "./components/Header";
 import InviteBanner from "./components/InviteBanner";
-import { loadConfig } from "./config";
 import { useSuperAdminClaim } from "./hooks/useSuperAdminClaim";
 import ArticlePage from "./pages/ArticlePage";
 import AuthorPage from "./pages/AuthorPage";

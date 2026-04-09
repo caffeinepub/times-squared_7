@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import type { Principal } from "@icp-sdk/core/principal";
 import { ArrowDown, ArrowUp, Loader2, X } from "lucide-react";
 import { Component, useCallback, useEffect, useRef, useState } from "react";
@@ -14,7 +15,6 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { ExternalBlob } from "../../backend";
 import type { Article } from "../../backend.d";
-import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import {
   useCreateArticle,
   useGetMyMemberships,

@@ -146,6 +146,8 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
   };
 
   const handleCellClick = (row: number, col: number) => {
+    // Focus MUST be first — before any setState — so iOS honors the gesture
+    hiddenInputRef.current?.focus();
     const cell = getCell(row, col);
     if (!cell || cell.isBlack) return;
     if (selectedCell?.row === row && selectedCell?.col === col) {
@@ -153,7 +155,6 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
     } else {
       setSelectedCell({ row, col });
     }
-    focusForInput();
   };
 
   const handleContainerKeyDown = (e: React.KeyboardEvent) => {
@@ -347,18 +348,16 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
           autoCorrect="off"
           autoCapitalize="characters"
           spellCheck={false}
-          tabIndex={-1}
+          tabIndex={0}
           onKeyDown={handleContainerKeyDown}
           onChange={handleHiddenInputChange}
           style={{
-            position: "absolute",
+            position: "fixed",
+            top: "-999px",
+            left: "-999px",
             opacity: 0,
-            width: 1,
-            height: 1,
-            top: 0,
-            left: 0,
-            pointerEvents: "none",
-            zIndex: -1,
+            width: "1px",
+            height: "1px",
           }}
         />
         <div
@@ -407,6 +406,9 @@ function CrosswordGrid({ puzzle }: CrosswordGridProps) {
                 }${userLetter ? `, letter ${userLetter}` : ""}`}
                 className={`relative border border-white/20 flex items-center justify-center select-none ${bgClass}`}
                 style={{ width: cellSize, height: cellSize }}
+                onTouchStart={() => {
+                  hiddenInputRef.current?.focus();
+                }}
                 onClick={() => handleCellClick(row, col)}
               >
                 {cell.number != null && (

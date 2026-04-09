@@ -1,5 +1,7 @@
+import { useActor, useInternetIdentity } from "@caffeineai/core-infrastructure";
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createActor } from "../backend";
 import type {
   Article,
   Comment,
@@ -15,11 +17,9 @@ import type {
   UserRole,
 } from "../backend.d";
 import { PuzzleType } from "../backend.d";
-import { useActor } from "./useActor";
-import { useInternetIdentity } from "./useInternetIdentity";
 
 export function useGetPublishedArticles() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Article[]>({
     queryKey: ["publishedArticles"],
     queryFn: async () => {
@@ -31,7 +31,7 @@ export function useGetPublishedArticles() {
 }
 
 export function useGetArticleById(id: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Article | null>({
     queryKey: ["article", id?.toString()],
     queryFn: async () => {
@@ -43,7 +43,7 @@ export function useGetArticleById(id: bigint | null) {
 }
 
 export function useGetArticlesByTag(tag: string) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Article[]>({
     queryKey: ["articlesByTag", tag],
     queryFn: async () => {
@@ -55,7 +55,7 @@ export function useGetArticlesByTag(tag: string) {
 }
 
 export function useGetArticlesByOrg(orgId: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Article[]>({
     queryKey: ["articlesByOrg", orgId?.toString()],
     queryFn: async () => {
@@ -67,7 +67,7 @@ export function useGetArticlesByOrg(orgId: bigint | null) {
 }
 
 export function useGetAuthorArticles(principal: string | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Article[]>({
     queryKey: ["authorArticles", principal],
     queryFn: async () => {
@@ -80,7 +80,7 @@ export function useGetAuthorArticles(principal: string | null) {
 }
 
 export function useSearchArticles(query: string) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Article[]>({
     queryKey: ["search", query],
     queryFn: async () => {
@@ -92,7 +92,7 @@ export function useSearchArticles(query: string) {
 }
 
 export function useGetOrgs() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<OrgSection[]>({
     queryKey: ["orgs"],
     queryFn: async () => {
@@ -104,7 +104,7 @@ export function useGetOrgs() {
 }
 
 export function useGetMyOrgs() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   const { identity } = useInternetIdentity();
   return useQuery<OrgSection[]>({
     queryKey: ["myOrgs"],
@@ -117,7 +117,7 @@ export function useGetMyOrgs() {
 }
 
 export function useGetOrgById(orgId: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<OrgSection | null>({
     queryKey: ["org", orgId?.toString()],
     queryFn: async () => {
@@ -130,7 +130,7 @@ export function useGetOrgById(orgId: bigint | null) {
 }
 
 export function useGetCallerUserProfile() {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor, isFetching: actorFetching } = useActor(createActor);
   const query = useQuery<UserProfile | null>({
     queryKey: ["callerProfile"],
     queryFn: async () => {
@@ -148,7 +148,7 @@ export function useGetCallerUserProfile() {
 }
 
 export function useGetUserProfile(principalStr: string | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<UserProfile | null>({
     queryKey: ["userProfile", principalStr],
     queryFn: async () => {
@@ -161,7 +161,7 @@ export function useGetUserProfile(principalStr: string | null) {
 }
 
 export function useIsCallerAdmin() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<boolean>({
     queryKey: ["isAdmin"],
     queryFn: async () => {
@@ -173,7 +173,7 @@ export function useIsCallerAdmin() {
 }
 
 export function useGetSuperAdmin() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Principal | null>({
     queryKey: ["superAdmin"],
     queryFn: async () => {
@@ -185,7 +185,7 @@ export function useGetSuperAdmin() {
 }
 
 export function useClaimSuperAdmin() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
@@ -200,7 +200,7 @@ export function useClaimSuperAdmin() {
 }
 
 export function useSaveCallerUserProfile() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
@@ -221,7 +221,7 @@ export function useSaveCallerUserProfile() {
 const articleKeys = ["allArticles", "publishedArticles"];
 
 export function useGetAllArticles() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Article[]>({
     queryKey: ["allArticles"],
     queryFn: async () => {
@@ -233,7 +233,7 @@ export function useGetAllArticles() {
 }
 
 export function useCreateArticle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
@@ -268,7 +268,7 @@ export function useCreateArticle() {
 }
 
 export function useUpdateArticle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
@@ -306,7 +306,7 @@ export function useUpdateArticle() {
 }
 
 export function useDeleteArticle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (articleId: bigint) => {
@@ -323,7 +323,7 @@ export function useDeleteArticle() {
 }
 
 export function usePublishArticle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (articleId: bigint) => {
@@ -339,7 +339,7 @@ export function usePublishArticle() {
 }
 
 export function useUnpublishArticle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (articleId: bigint) => {
@@ -355,7 +355,7 @@ export function useUnpublishArticle() {
 }
 
 export function useFeatureArticle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (articleId: bigint) => {
@@ -373,7 +373,7 @@ export function useFeatureArticle() {
 }
 
 export function useUnfeatureArticle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (articleId: bigint) => {
@@ -391,7 +391,7 @@ export function useUnfeatureArticle() {
 }
 
 export function useCreateOrg() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
@@ -418,7 +418,7 @@ export function useCreateOrg() {
 }
 
 export function useUpdateOrg() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
@@ -447,7 +447,7 @@ export function useUpdateOrg() {
 }
 
 export function useDeleteOrg() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (orgId: bigint) => {
@@ -462,7 +462,7 @@ export function useDeleteOrg() {
 }
 
 export function useAssignUserRole() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   return useMutation({
     mutationFn: async (args: { user: Principal; role: UserRole }) => {
       if (!actor) throw new Error("Actor not available");
@@ -474,7 +474,7 @@ export function useAssignUserRole() {
 // ─── Invite & Membership Queries ─────────────────────────────────────────────
 
 export function useGetMyInvites() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   const { identity } = useInternetIdentity();
   return useQuery<OrgInvite[]>({
     queryKey: ["myInvites"],
@@ -487,7 +487,7 @@ export function useGetMyInvites() {
 }
 
 export function useGetMyMemberships() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   const { identity } = useInternetIdentity();
   return useQuery<OrgMembership[]>({
     queryKey: ["myMemberships"],
@@ -500,7 +500,7 @@ export function useGetMyMemberships() {
 }
 
 export function useGetOrgMembers(orgId: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<OrgMembership[]>({
     queryKey: ["orgMembers", orgId?.toString()],
     queryFn: async () => {
@@ -512,7 +512,7 @@ export function useGetOrgMembers(orgId: bigint | null) {
 }
 
 export function useInviteUserToOrg() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: { orgId: bigint; userPrincipal: Principal }) => {
@@ -528,7 +528,7 @@ export function useInviteUserToOrg() {
 }
 
 export function useRemoveOrgMember() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
@@ -547,7 +547,7 @@ export function useRemoveOrgMember() {
 }
 
 export function useRespondToOrgInvite() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: { inviteId: bigint; accept: boolean }) => {
@@ -564,7 +564,7 @@ export function useRespondToOrgInvite() {
 // ─── B2: Submission Queries ───────────────────────────────────────────────────
 
 export function useGetMySubmissions() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   const { identity } = useInternetIdentity();
   return useQuery<SubmissionWithArticle[]>({
     queryKey: ["mySubmissions"],
@@ -577,7 +577,7 @@ export function useGetMySubmissions() {
 }
 
 export function useGetPendingSubmissions(orgId: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<SubmissionWithArticle[]>({
     queryKey: ["pendingSubmissions", orgId?.toString()],
     queryFn: async () => {
@@ -589,7 +589,7 @@ export function useGetPendingSubmissions(orgId: bigint | null) {
 }
 
 export function useSubmitArticleForReview() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (articleId: bigint) => {
@@ -603,7 +603,7 @@ export function useSubmitArticleForReview() {
 }
 
 export function useApproveArticleSubmission() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (articleId: bigint) => {
@@ -620,7 +620,7 @@ export function useApproveArticleSubmission() {
 }
 
 export function useRejectArticleSubmission() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: { articleId: bigint; note: string | null }) => {
@@ -636,7 +636,7 @@ export function useRejectArticleSubmission() {
 // ─── Comment Queries ──────────────────────────────────────────────────────────
 
 export function useGetCommentsByArticle(articleId: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Comment[]>({
     queryKey: ["comments", articleId?.toString()],
     queryFn: async () => {
@@ -648,7 +648,7 @@ export function useGetCommentsByArticle(articleId: bigint | null) {
 }
 
 export function useAddComment() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: { articleId: bigint; body: string }) => {
@@ -664,7 +664,7 @@ export function useAddComment() {
 }
 
 export function useDeleteComment() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (commentId: bigint) => {
@@ -685,7 +685,7 @@ function puzzleActor(actor: unknown): FullBackendInterface {
 }
 
 export function useGetAllPuzzles() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Puzzle[]>({
     queryKey: ["allPuzzles"],
     queryFn: async () => {
@@ -697,7 +697,7 @@ export function useGetAllPuzzles() {
 }
 
 export function useCreatePuzzle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
@@ -725,7 +725,7 @@ export function useCreatePuzzle() {
 }
 
 export function useUpdatePuzzle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: {
@@ -753,7 +753,7 @@ export function useUpdatePuzzle() {
 }
 
 export function useDeletePuzzle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
@@ -767,7 +767,7 @@ export function useDeletePuzzle() {
 }
 
 export function useSetActivePuzzle() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
@@ -782,7 +782,7 @@ export function useSetActivePuzzle() {
 }
 
 export function useGetActivePuzzles() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<{ mini: Puzzle | null; standard: Puzzle | null }>({
     queryKey: ["activePuzzles"],
     queryFn: async () => {
